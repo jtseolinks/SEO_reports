@@ -1,0 +1,409 @@
+import type { ReportData, ReportMetricChange } from "./report-data";
+import { type ReportConfig, DEFAULT_REPORT_CONFIG } from "./report-config";
+
+// ── formatters ────────────────────────────────────────────────────────────────
+
+function fmtBig(n: number): string {
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1).replace(/\.0$/, "") + "M";
+  if (n >= 1_000) return (n / 1_000).toFixed(1).replace(/\.0$/, "") + "K";
+  return n.toLocaleString("he-IL");
+}
+
+function fmtNum(n: number, dec = 0): string {
+  return n.toFixed(dec);
+}
+
+function fmtPct(n: number, dec = 2): string {
+  return n.toFixed(dec) + "%";
+}
+
+function fmtDate(iso: string): string {
+  return new Date(iso + "T12:00:00").toLocaleDateString("he-IL", {
+    day: "2-digit", month: "long", year: "numeric",
+  });
+}
+
+function fmtPeriod(start: string, end: string): string {
+  const s = new Date(start + "T12:00:00");
+  const e = new Date(end + "T12:00:00");
+  return `${s.getDate().toString().padStart(2, "0")} ${s.toLocaleDateString("he-IL", { month: "long" })} – ${e.getDate().toString().padStart(2, "0")} ${e.toLocaleDateString("he-IL", { month: "long", year: "numeric" })}`;
+}
+
+// ── change badge ──────────────────────────────────────────────────────────────
+
+function changeBadge(m: ReportMetricChange, lowerIsBetter = false): string {
+  if (Math.abs(m.changePct) < 0.01 && Math.abs(m.change) < 0.01) {
+    return `<span style="font-size:11px;color:#9ca3af;font-weight:500">ללא שינוי</span>`;
+  }
+  const isPositive = lowerIsBetter ? m.change < 0 : m.change > 0;
+  const color = isPositive ? "#16a34a" : "#dc2626";
+  const bg = isPositive ? "#f0fdf4" : "#fef2f2";
+  const border = isPositive ? "#bbf7d0" : "#fecaca";
+  const arrow = m.change > 0 ? "↑" : "↓";
+  const sign = m.changePct > 0 ? "+" : "";
+  return `<span style="display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:600;color:${color};background:${bg};border:1px solid ${border};padding:2px 7px;border-radius:20px;line-height:1.4">${arrow} ${sign}${fmtPct(Math.abs(m.changePct), 1)}</span>`;
+}
+
+// ── KPI card ──────────────────────────────────────────────────────────────────
+
+function kpiCard(label: string, value: string, sub: string, m: ReportMetricChange, lowerIsBetter = false): string {
+  return `
+  <div style="flex:1;background:#F8F9FB;border:1.5px solid #E8EAEE;border-radius:12px;padding:18px 20px;">
+    <div style="font-size:11px;color:#6b7280;font-weight:500;margin-bottom:4px">${label}</div>
+    <div style="font-size:28px;font-weight:800;color:#111827;letter-spacing:-0.03em;line-height:1.1">${value}</div>
+    ${sub ? `<div style="font-size:11px;color:#9ca3af;margin-top:2px">${sub}</div>` : ""}
+    <div style="margin-top:10px">${changeBadge(m, lowerIsBetter)}</div>
+  </div>`;
+}
+
+// ── SVG trend chart ───────────────────────────────────────────────────────────
+
+function trendChart(trendData: { date: string; clicks: number }[]): string {
+  if (!trendData || trendData.length < 3) {
+    return `<div style="height:120px;display:flex;align-items:center;justify-content:center;color:#9ca3af;font-size:12px">אין נתוני מגמה זמינים</div>`;
+  }
+
+  const W = 680, H = 140;
+  const pt = 16, pb = 28, pl = 36, pr = 12;
+  const chartW = W - pl - pr;
+  const chartH = H - pt - pb;
+  const n = trendData.length;
+
+  const maxV = Math.max(...trendData.map(d => d.clicks), 1);
+  const minV = Math.min(...trendData.map(d => d.clicks));
+  const range = maxV - minV || 1;
+
+  const x = (i: number) => pl + (i / (n - 1)) * chartW;
+  const y = (v: number) => pt + (1 - (v - minV) / range) * chartH;
+
+  const pts = trendData.map((d, i) => `${x(i).toFixed(1)},${y(d.clicks).toFixed(1)}`).join(" ");
+  const area = `${x(0).toFixed(1)},${(H - pb).toFixed(1)} ${pts} ${x(n - 1).toFixed(1)},${(H - pb).toFixed(1)}`;
+
+  // X-axis date labels
+  const step = Math.ceil(n / 6);
+  const xLabels = trendData
+    .filter((_, i) => i === 0 || i === n - 1 || i % step === 0)
+    .map(d => {
+      const i = trendData.indexOf(d);
+      const day = new Date(d.date + "T12:00:00").getDate();
+      return `<text x="${x(i).toFixed(1)}" y="${H - 6}" text-anchor="middle" font-size="9" fill="#9ca3af" font-family="Heebo,Arial,sans-serif">${day}</text>`;
+    }).join("");
+
+  // Y gridlines
+  const gridLines = [0, 0.5, 1].map(pct => {
+    const yv = pt + (1 - pct) * chartH;
+    const val = Math.round(minV + pct * range);
+    const label = val >= 1000 ? (val / 1000).toFixed(1).replace(/\.0$/, "") + "K" : val.toString();
+    return `
+      <line x1="${pl}" y1="${yv.toFixed(1)}" x2="${W - pr}" y2="${yv.toFixed(1)}" stroke="#f1f5f9" stroke-width="1"/>
+      <text x="${(pl - 5).toFixed(1)}" y="${(yv + 3.5).toFixed(1)}" text-anchor="end" font-size="8" fill="#cbd5e1" font-family="Heebo,Arial,sans-serif">${label}</text>`;
+  }).join("");
+
+  // Highlight dots for peak and today
+  const peakIdx = trendData.reduce((mi, d, i) => d.clicks > trendData[mi].clicks ? i : mi, 0);
+
+  return `
+  <svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="display:block;width:100%;height:${H}px">
+    <defs>
+      <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#1E2D7D" stop-opacity="0.18"/>
+        <stop offset="100%" stop-color="#1E2D7D" stop-opacity="0.01"/>
+      </linearGradient>
+    </defs>
+    ${gridLines}
+    <polygon points="${area}" fill="url(#areaGrad)"/>
+    <polyline points="${pts}" fill="none" stroke="#1E2D7D" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+    ${trendData.map((d, i) => `<circle cx="${x(i).toFixed(1)}" cy="${y(d.clicks).toFixed(1)}" r="${i === peakIdx ? 4 : 2.5}" fill="${i === peakIdx ? "#5BC2F0" : "#1E2D7D"}" opacity="${i === peakIdx ? 1 : 0.7}"/>`).join("")}
+    ${xLabels}
+  </svg>`;
+}
+
+// ── position bar ──────────────────────────────────────────────────────────────
+
+function posBar(pos: number): string {
+  if (!pos || pos === 0) return `<span style="color:#9ca3af">—</span>`;
+  const color = pos <= 3 ? "#16a34a" : pos <= 10 ? "#1E2D7D" : pos <= 20 ? "#d97706" : "#9ca3af";
+  const barW = Math.max(4, Math.min(100, Math.round(100 - (pos / 100) * 88)));
+  return `<span style="display:inline-flex;align-items:center;gap:5px;direction:ltr">
+    <span style="font-weight:700;color:${color};font-size:12px;min-width:30px">${pos.toFixed(1)}</span>
+    <span style="display:inline-block;width:40px;height:4px;background:#e5e7eb;border-radius:2px;overflow:hidden;flex-shrink:0">
+      <span style="display:block;width:${barW}%;height:100%;background:${color};border-radius:2px"></span>
+    </span>
+  </span>`;
+}
+
+function changeCell(change: number): string {
+  if (!change) return `<span style="color:#9ca3af">—</span>`;
+  const isPos = change > 0;
+  const color = isPos ? "#16a34a" : "#dc2626";
+  return `<span style="color:${color};font-weight:600;font-size:11px">${isPos ? "↑" : "↓"} ${Math.abs(change).toFixed(1)}</span>`;
+}
+
+// ── section header ────────────────────────────────────────────────────────────
+
+function sectionHeader(title: string, num: string): string {
+  return `
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;padding-bottom:10px;border-bottom:2px solid #EEF0F9">
+    <div style="font-size:17px;font-weight:800;color:#111827;letter-spacing:-0.01em">${title}</div>
+    <div style="font-size:11px;font-weight:700;color:#1E2D7D;background:#EEF0F9;padding:3px 10px;border-radius:20px">${num}</div>
+  </div>`;
+}
+
+// ── source tag ────────────────────────────────────────────────────────────────
+
+function sourceTag(source: "gsc" | "ga4" | "both"): string {
+  const gsc = `<span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:600;color:#166534;background:#f0fdf4;border:1px solid #bbf7d0;padding:2px 8px;border-radius:20px;line-height:1.5"><span style="width:6px;height:6px;border-radius:50%;background:#16a34a;display:inline-block;flex-shrink:0"></span>Google Search Console</span>`;
+  const ga4 = `<span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:600;color:#9a3412;background:#fff7ed;border:1px solid #fed7aa;padding:2px 8px;border-radius:20px;line-height:1.5"><span style="width:6px;height:6px;border-radius:50%;background:#ea580c;display:inline-block;flex-shrink:0"></span>Google Analytics 4</span>`;
+  const tags = source === "gsc" ? gsc : source === "ga4" ? ga4 : `${gsc}${ga4}`;
+  return `<div style="display:flex;align-items:center;gap:6px;margin-bottom:12px"><span style="font-size:10px;color:#9ca3af;font-weight:500">מקור נתונים:</span>${tags}</div>`;
+}
+
+
+// ── main export ───────────────────────────────────────────────────────────────
+
+export function generateReportHtml(data: ReportData, agencyName: string, agencyEmail: string, logoDataUrl = "", cfg: ReportConfig = DEFAULT_REPORT_CONFIG): string {
+  const periodLabel = fmtPeriod(data.period.startDate, data.period.endDate);
+  const compLabel = fmtPeriod(data.comparisonPeriod.startDate, data.comparisonPeriod.endDate);
+  const generatedDate = new Date().toLocaleDateString("he-IL", { day: "2-digit", month: "long", year: "numeric" });
+
+  const hasGa4 = data.ga4.sessions.current > 0;
+
+  // ── section 01: KPIs ──────────────────────────────────────────────────────
+  const kpiCards = [
+    cfg.kpi_clicks      && kpiCard("קליקים אורגניים", fmtBig(data.gsc.clicks.current), "", data.gsc.clicks),
+    cfg.kpi_impressions && kpiCard("חשיפות", fmtBig(data.gsc.impressions.current), "", data.gsc.impressions),
+    cfg.kpi_ctr         && kpiCard("CTR ממוצע", fmtPct(data.gsc.ctr.current * 100), "", data.gsc.ctr),
+    cfg.kpi_position    && kpiCard("פוזיציה ממוצעת", fmtNum(data.gsc.position.current, 1), "מיקום ממוצע ב-Google", data.gsc.position, true),
+  ].filter(Boolean).join("");
+  const kpis = kpiCards ? `<div style="display:flex;gap:12px">${kpiCards}</div>` : "";
+
+  // Executive summary text
+  const clicksTrend = data.gsc.clicks.improved ? "עלו" : data.gsc.clicks.improved === false ? "ירדו" : "נשארו יציבים";
+  const improvedNonBrand = data.keywords.filter(k => !k.isBrand && k.change > 2).length;
+  const execText = cfg.exec_summary
+    ? `הקליקים האורגניים ${clicksTrend} ב-${fmtPct(Math.abs(data.gsc.clicks.changePct))} בהשוואה ל-${compLabel}.${data.gsc.opportunities.length > 0 ? ` קיימות ${data.gsc.opportunities.length} הזדמנויות SEO עם פוטנציאל חשיפה גבוה.` : ""}${improvedNonBrand > 0 ? ` ${improvedNonBrand} ביטויים עוקבים שיפרו את מיקומם.` : ""}`
+    : "";
+
+  // ── section 02: Organic Traffic ──────────────────────────────────────────
+  const chart = cfg.trend_chart ? trendChart(data.gsc.trendData) : "";
+
+  const ga4StatItems = hasGa4 ? [
+    cfg.ga4_sessions ? `
+    <div style="flex:1;padding-left:20px;border-left:1px solid #E8EAEE">
+      <div style="font-size:10px;color:#9ca3af;margin-bottom:3px">סשנים אורגניים</div>
+      <div style="font-size:20px;font-weight:700;color:#111827">${fmtBig(data.ga4.sessions.current)}</div>
+      ${data.ga4.sessions.change !== 0 ? `<div style="font-size:11px;color:${data.ga4.sessions.improved ? "#16a34a" : "#dc2626"};margin-top:2px">${data.ga4.sessions.improved ? "+" : ""}${fmtPct(data.ga4.sessions.changePct, 1)}</div>` : ""}
+    </div>` : "",
+    cfg.ga4_revenue ? `
+    <div style="flex:1">
+      <div style="font-size:10px;color:#9ca3af;margin-bottom:3px">הכנסות כוללות</div>
+      <div style="font-size:20px;font-weight:700;color:#111827">₪${fmtBig(data.ga4.revenue.current)}</div>
+      ${data.ga4.revenue.change !== 0 ? `<div style="font-size:11px;color:${data.ga4.revenue.improved ? "#16a34a" : "#dc2626"};margin-top:2px">${data.ga4.revenue.improved ? "+" : ""}${fmtPct(data.ga4.revenue.changePct, 1)}</div>` : ""}
+    </div>` : "",
+  ].filter(Boolean) : [];
+  const ga4Stats = ga4StatItems.length
+    ? `<div style="display:flex;gap:0;margin-top:16px;padding-top:16px;border-top:1px solid #E8EAEE">${ga4StatItems.join("")}</div>`
+    : "";
+
+  // ── section 03: Tracked Keywords ─────────────────────────────────────────
+  const keywordRows = data.keywords.map((kw, i) => `
+    <tr style="${i % 2 === 0 ? "" : "background:#fafafa"}">
+      <td style="padding:9px 14px;font-size:12.5px;color:#1f2937;font-weight:500;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${kw.keyword}</td>
+      <td style="padding:9px 14px;text-align:left">${posBar(kw.position)}</td>
+      <td style="padding:9px 14px;text-align:left;font-size:12px;color:#374151">${fmtPct(kw.ctr, 2)}</td>
+      <td style="padding:9px 14px;text-align:left">${changeCell(kw.change)}</td>
+    </tr>`).join("");
+
+  // ── section 04: Top Pages ─────────────────────────────────────────────────
+  const topPagesRows = data.gsc.topPages.slice(0, 12).map((p, i) => {
+    const prevData = null; // no prev data per page in current structure
+    const urlDisplay = (p.page ?? "").replace(/^https?:\/\/[^/]+/, "").replace(/\/$/, "") || "/";
+    return `
+    <tr style="${i % 2 === 0 ? "" : "background:#fafafa"}">
+      <td style="padding:9px 14px;font-size:11.5px;color:#4b5563;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:monospace">${urlDisplay}</td>
+      <td style="padding:9px 14px;text-align:left;font-size:12px;font-weight:600;color:#111827;font-variant-numeric:tabular-nums">${fmtBig(p.clicks)}</td>
+      <td style="padding:9px 14px;text-align:left;font-size:12px;color:#374151;font-variant-numeric:tabular-nums">${fmtBig(p.impressions)}</td>
+      <td style="padding:9px 14px;text-align:left;font-size:12px;color:#374151">${fmtPct(p.ctr * 100, 2)}</td>
+      <td style="padding:9px 14px;text-align:left">${posBar(p.position)}</td>
+    </tr>`;
+  }).join("");
+
+  // ── section 05: GA4 Landing Pages (optional) ──────────────────────────────
+  const ga4PagesRows = data.ga4.topLandingPages.slice(0, 10).map((p, i) => {
+    const urlDisplay = (p.landingPage ?? "").replace(/^https?:\/\/[^/]+/, "").replace(/\/$/, "") || "/";
+    return `
+    <tr style="${i % 2 === 0 ? "" : "background:#fafafa"}">
+      <td style="padding:9px 14px;font-size:11.5px;color:#4b5563;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:monospace">${urlDisplay}</td>
+      <td style="padding:9px 14px;text-align:left;font-size:12px;font-weight:600;color:#111827">${fmtBig(p.sessions)}</td>
+      <td style="padding:9px 14px;text-align:left;font-size:12px;color:#374151">${p.keyEvents > 0 ? fmtBig(p.keyEvents) : "—"}</td>
+    </tr>`;
+  }).join("");
+
+
+  // ── HTML ──────────────────────────────────────────────────────────────────
+  return `<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Heebo', Arial, 'Segoe UI', sans-serif;
+    color: #1f2937;
+    background: white;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    direction: rtl;
+  }
+  @page { size: A4; margin: 0; }
+  @media print {
+    .section { page-break-inside: avoid; }
+  }
+  table { border-collapse: collapse; width: 100%; }
+  th { background: #F8F9FB; font-size: 11px; font-weight: 600; color: #6b7280; padding: 9px 14px; text-align: right; border-bottom: 1.5px solid #E8EAEE; }
+  th.num { text-align: left; }
+</style>
+</head>
+<body>
+<div style="width:794px;background:white;">
+
+  <!-- ══ COVER ══ -->
+  <div style="background:#1E2D7D;color:white;padding:44px 48px 40px;position:relative;min-height:210px">
+    <!-- Logo or branding top-left -->
+    <div style="position:absolute;top:36px;left:48px;">
+      ${logoDataUrl
+        ? `<img src="${logoDataUrl}" alt="${agencyName}" style="max-height:48px;max-width:140px;object-fit:contain;display:block;"/>`
+        : `<div style="font-size:13px;font-weight:800;opacity:0.45;letter-spacing:0.02em">#RANKEY</div>`
+      }
+    </div>
+
+    <!-- Tag line -->
+    <div style="font-size:11px;font-weight:600;opacity:0.55;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:14px">
+      דוח SEO חודשי • ${periodLabel}
+    </div>
+
+    <!-- Client name -->
+    <div style="font-size:34px;font-weight:800;letter-spacing:-0.02em;margin-bottom:6px;line-height:1.1">${data.client.name}</div>
+    <div style="font-size:15px;opacity:0.7;margin-bottom:28px">${data.client.domain}</div>
+
+    <!-- Meta row -->
+    <div style="display:flex;gap:36px">
+      <div>
+        <div style="font-size:10px;opacity:0.55;margin-bottom:3px;font-weight:500">תקופת הדוח</div>
+        <div style="font-size:13px;font-weight:600">${periodLabel}</div>
+      </div>
+      <div>
+        <div style="font-size:10px;opacity:0.55;margin-bottom:3px;font-weight:500">השוואה ל</div>
+        <div style="font-size:13px;font-weight:600">${compLabel}</div>
+      </div>
+      <div>
+        <div style="font-size:10px;opacity:0.55;margin-bottom:3px;font-weight:500">הופק ב</div>
+        <div style="font-size:13px;font-weight:600">${generatedDate}</div>
+      </div>
+      ${agencyEmail ? `<div>
+        <div style="font-size:10px;opacity:0.55;margin-bottom:3px;font-weight:500">הכין עבורך</div>
+        <div style="font-size:13px;font-weight:600">${agencyEmail}</div>
+      </div>` : ""}
+    </div>
+  </div>
+
+  <div style="padding:36px 48px">
+
+    <!-- ══ SECTION 01: PERFORMANCE SUMMARY ══ -->
+    ${(cfg.kpi_clicks || cfg.kpi_impressions || cfg.kpi_ctr || cfg.kpi_position || cfg.exec_summary) ? `
+    <div style="margin-bottom:32px">
+      ${sectionHeader("תקציר ביצועים", "01")}
+      ${sourceTag("gsc")}
+      ${kpis}
+      ${execText ? `<div style="margin-top:14px;padding:14px 18px;background:#F8F9FB;border:1px solid #E8EAEE;border-radius:10px;font-size:13px;line-height:1.75;color:#374151">${execText}</div>` : ""}
+    </div>` : ""}
+
+    <!-- ══ SECTION 02: ORGANIC TRAFFIC ══ -->
+    ${(cfg.trend_chart || cfg.ga4_sessions || cfg.ga4_revenue) ? `
+    <div style="margin-bottom:32px;page-break-inside:avoid">
+      ${sectionHeader(`תנועה אורגנית – ${periodLabel}`, "02")}
+      ${hasGa4 ? sourceTag("both") : sourceTag("gsc")}
+      <div style="background:#F8F9FB;border:1.5px solid #E8EAEE;border-radius:12px;padding:20px 20px 16px">
+        ${chart}
+        ${ga4Stats}
+      </div>
+    </div>` : ""}
+
+    <!-- ══ SECTION 03: KEYWORDS ══ -->
+    ${cfg.keywords_table ? `
+    <div style="margin-bottom:32px;page-break-inside:avoid">
+      ${sectionHeader("ביטויי מפתח ומיקומים ב-Google", "03")}
+      ${sourceTag("gsc")}
+      <div style="font-size:11px;color:#9ca3af;margin-bottom:10px">
+        ביטויים נבחרים שנבדקים ומעוקבים עבור הלקוח.
+      </div>
+      <div style="border:1.5px solid #E8EAEE;border-radius:12px;overflow:hidden">
+        <table>
+          <thead>
+            <tr>
+              <th>ביטוי</th>
+              <th class="num">פוזיציה</th>
+              <th class="num">CTR</th>
+              <th class="num">שינוי</th>
+            </tr>
+          </thead>
+          <tbody>${keywordRows || `<tr><td colspan="4" style="padding:20px;text-align:center;color:#9ca3af;font-size:12px">לא הוגדרו ביטויים מעוקבים ללקוח זה</td></tr>`}</tbody>
+        </table>
+      </div>
+    </div>` : ""}
+
+    <!-- ══ SECTION 04: TOP PAGES ══ -->
+    ${cfg.pages_table ? `
+    <div style="margin-bottom:32px;page-break-inside:avoid">
+      ${sectionHeader("דפים מובילים", "04")}
+      ${sourceTag("gsc")}
+      <div style="border:1.5px solid #E8EAEE;border-radius:12px;overflow:hidden">
+        <table>
+          <thead>
+            <tr>
+              <th>דף</th>
+              <th class="num">קליקים</th>
+              <th class="num">חשיפות</th>
+              <th class="num">CTR</th>
+              <th class="num">פוזיציה</th>
+            </tr>
+          </thead>
+          <tbody>${topPagesRows}</tbody>
+        </table>
+      </div>
+    </div>` : ""}
+
+    <!-- ══ SECTION 05: GA4 PAGES ══ -->
+    ${cfg.ga4_pages && hasGa4 && data.ga4.topLandingPages.length > 0 ? `
+    <div style="margin-bottom:32px;page-break-inside:avoid">
+      ${sectionHeader("דפי נחיתה אורגניים (Analytics)", "05")}
+      ${sourceTag("ga4")}
+      <div style="border:1.5px solid #E8EAEE;border-radius:12px;overflow:hidden">
+        <table>
+          <thead>
+            <tr>
+              <th>דף</th>
+              <th class="num">סשנים אורגניים</th>
+              <th class="num">Key Events</th>
+            </tr>
+          </thead>
+          <tbody>${ga4PagesRows}</tbody>
+        </table>
+      </div>
+    </div>` : ""}
+
+  </div>
+
+  <!-- ══ FOOTER ══ -->
+  <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 48px;background:#F8F9FB;border-top:1.5px solid #E8EAEE;font-size:11px;color:#9ca3af">
+    <span>${data.period.startDate} – ${data.period.endDate}</span>
+    <span style="font-weight:800;color:#1E2D7D;font-size:13px;letter-spacing:0.02em">#RANKEY</span>
+    <span>${agencyName}${agencyEmail ? " · " + agencyEmail : ""}</span>
+  </div>
+
+</div>
+</body>
+</html>`;
+}
