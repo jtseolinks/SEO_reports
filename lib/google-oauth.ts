@@ -11,18 +11,21 @@ export function createOAuth2Client(): OAuth2Client {
   );
 }
 
+export const OAUTH_STATE_COOKIE = "google_oauth_state";
+
 export const GOOGLE_SCOPES = [
   "https://www.googleapis.com/auth/webmasters.readonly",
   "https://www.googleapis.com/auth/analytics.readonly",
   "https://www.googleapis.com/auth/business.manage",
 ];
 
-export function getAuthorizationUrl(): string {
+export function getAuthorizationUrl(state: string): string {
   const client = createOAuth2Client();
   return client.generateAuthUrl({
     access_type: "offline",
     prompt: "consent",
     scope: GOOGLE_SCOPES,
+    state,
   });
 }
 

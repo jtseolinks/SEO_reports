@@ -1,7 +1,7 @@
 import nodemailer from "nodemailer";
 import fs from "fs/promises";
-import path from "path";
 import { getAgencySettings } from "./agency-settings";
+import { reportFilePath } from "./report-storage";
 
 async function createTransport() {
   const s = await getAgencySettings();
@@ -25,7 +25,7 @@ export type SendReportEmailParams = {
   cc?: string[];
   clientName: string;
   monthName: string;
-  pdfUrl: string; // path relative to /public, e.g. /reports/report_xxx.pdf
+  pdfUrl: string; // e.g. /reports/report_xxx.pdf (served by the authenticated route)
 };
 
 function buildEmailSubject(clientName: string, monthName: string): string {
@@ -49,10 +49,10 @@ export async function sendReportEmail(params: SendReportEmailParams): Promise<st
   const fromName   = s.emailSenderName  || agencyName;
   const fromEmail  = s.emailSenderEmail || process.env.SMTP_FROM || "noreply@example.com";
 
-  // Resolve the PDF file path on disk
-  const pdfFilePath = path.join(process.cwd(), "public", pdfUrl.replace(/^\//, ""));
+  // Resolve the PDF file path on disk (private reports dir, not /public)
+  const pdfFilePath = reportFilePath(pdfUrl);
   const pdfBuffer = await fs.readFile(pdfFilePath);
-  const pdfFilename = path.basename(pdfFilePath);
+  const pdfFilename = pdfFilePath.split(/[\\/]/).pop() ?? "report.pdf";
 
   const bcc = (s.agencyBccEnabled === "true" && s.agencyBccEmail) ? s.agencyBccEmail : undefined;
 

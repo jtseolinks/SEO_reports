@@ -2,6 +2,7 @@ import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { compare } from "bcryptjs";
 import { prisma } from "./prisma";
+import { registerLoginAttempt, resetLoginAttempts } from "./rate-limit";
 
 export const authOptions: NextAuthOptions = {
   session: {
@@ -19,9 +20,17 @@ export const authOptions: NextAuthOptions = {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
       },
-      async authorize(credentials) {
+      async authorize(credentials, req) {
         if (!credentials?.email || !credentials?.password) {
           return null;
+        }
+
+        // Throttle by email + client IP to slow down brute-force attacks.
+        const fwd = (req?.headers?.["x-forwarded-for"] as string | undefined) ?? "";
+        const ip = fwd.split(",")[0].trim() || "unknown";
+        const rateKey = `${credentials.email.toLowerCase()}|${ip}`;
+        if (!registerLoginAttempt(rateKey)) {
+          throw new Error("Too many login attempts. Please try again later.");
         }
 
         const user = await prisma.user.findUnique({
@@ -36,6 +45,9 @@ export const authOptions: NextAuthOptions = {
         if (!isValid) {
           return null;
         }
+
+        // Successful login → clear the throttle counter.
+        resetLoginAttempts(rateKey);
 
         return {
           id: user.id,

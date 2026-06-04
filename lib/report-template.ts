@@ -1,6 +1,18 @@
 import type { ReportData, ReportMetricChange } from "./report-data";
 import { type ReportConfig, DEFAULT_REPORT_CONFIG } from "./report-config";
 
+// ── HTML escaping ───────────────────────────────────────────────────────────────
+// All dynamic strings (keywords, page URLs, client/agency names) are escaped
+// before interpolation so they cannot inject markup into the rendered HTML/PDF.
+function esc(value: unknown): string {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 // ── formatters ────────────────────────────────────────────────────────────────
 
 function fmtBig(n: number): string {
@@ -208,7 +220,7 @@ export function generateReportHtml(data: ReportData, agencyName: string, agencyE
   // ── section 03: Tracked Keywords ─────────────────────────────────────────
   const keywordRows = data.keywords.map((kw, i) => `
     <tr style="${i % 2 === 0 ? "" : "background:#fafafa"}">
-      <td style="padding:9px 14px;font-size:12.5px;color:#1f2937;font-weight:500;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${kw.keyword}</td>
+      <td style="padding:9px 14px;font-size:12.5px;color:#1f2937;font-weight:500;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(kw.keyword)}</td>
       <td style="padding:9px 14px;text-align:left">${posBar(kw.position)}</td>
       <td style="padding:9px 14px;text-align:left;font-size:12px;color:#374151">${fmtPct(kw.ctr, 2)}</td>
       <td style="padding:9px 14px;text-align:left">${changeCell(kw.change)}</td>
@@ -220,7 +232,7 @@ export function generateReportHtml(data: ReportData, agencyName: string, agencyE
     const urlDisplay = (p.page ?? "").replace(/^https?:\/\/[^/]+/, "").replace(/\/$/, "") || "/";
     return `
     <tr style="${i % 2 === 0 ? "" : "background:#fafafa"}">
-      <td style="padding:9px 14px;font-size:11.5px;color:#4b5563;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:monospace">${urlDisplay}</td>
+      <td style="padding:9px 14px;font-size:11.5px;color:#4b5563;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:monospace">${esc(urlDisplay)}</td>
       <td style="padding:9px 14px;text-align:left;font-size:12px;font-weight:600;color:#111827;font-variant-numeric:tabular-nums">${fmtBig(p.clicks)}</td>
       <td style="padding:9px 14px;text-align:left;font-size:12px;color:#374151;font-variant-numeric:tabular-nums">${fmtBig(p.impressions)}</td>
       <td style="padding:9px 14px;text-align:left;font-size:12px;color:#374151">${fmtPct(p.ctr * 100, 2)}</td>
@@ -233,7 +245,7 @@ export function generateReportHtml(data: ReportData, agencyName: string, agencyE
     const urlDisplay = (p.landingPage ?? "").replace(/^https?:\/\/[^/]+/, "").replace(/\/$/, "") || "/";
     return `
     <tr style="${i % 2 === 0 ? "" : "background:#fafafa"}">
-      <td style="padding:9px 14px;font-size:11.5px;color:#4b5563;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:monospace">${urlDisplay}</td>
+      <td style="padding:9px 14px;font-size:11.5px;color:#4b5563;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:monospace">${esc(urlDisplay)}</td>
       <td style="padding:9px 14px;text-align:left;font-size:12px;font-weight:600;color:#111827">${fmtBig(p.sessions)}</td>
       <td style="padding:9px 14px;text-align:left;font-size:12px;color:#374151">${p.keyEvents > 0 ? fmtBig(p.keyEvents) : "—"}</td>
     </tr>`;
@@ -274,7 +286,7 @@ export function generateReportHtml(data: ReportData, agencyName: string, agencyE
     <!-- Logo or branding top-left -->
     <div style="position:absolute;top:36px;left:48px;">
       ${logoDataUrl
-        ? `<img src="${logoDataUrl}" alt="${agencyName}" style="max-height:48px;max-width:140px;object-fit:contain;display:block;"/>`
+        ? `<img src="${esc(logoDataUrl)}" alt="${esc(agencyName)}" style="max-height:48px;max-width:140px;object-fit:contain;display:block;"/>`
         : `<div style="font-size:13px;font-weight:800;opacity:0.45;letter-spacing:0.02em">#RANKEY</div>`
       }
     </div>
@@ -285,8 +297,8 @@ export function generateReportHtml(data: ReportData, agencyName: string, agencyE
     </div>
 
     <!-- Client name -->
-    <div style="font-size:34px;font-weight:800;letter-spacing:-0.02em;margin-bottom:6px;line-height:1.1">${data.client.name}</div>
-    <div style="font-size:15px;opacity:0.7;margin-bottom:28px">${data.client.domain}</div>
+    <div style="font-size:34px;font-weight:800;letter-spacing:-0.02em;margin-bottom:6px;line-height:1.1">${esc(data.client.name)}</div>
+    <div style="font-size:15px;opacity:0.7;margin-bottom:28px">${esc(data.client.domain)}</div>
 
     <!-- Meta row -->
     <div style="display:flex;gap:36px">
@@ -304,7 +316,7 @@ export function generateReportHtml(data: ReportData, agencyName: string, agencyE
       </div>
       ${agencyEmail ? `<div>
         <div style="font-size:10px;opacity:0.55;margin-bottom:3px;font-weight:500">הכין עבורך</div>
-        <div style="font-size:13px;font-weight:600">${agencyEmail}</div>
+        <div style="font-size:13px;font-weight:600">${esc(agencyEmail)}</div>
       </div>` : ""}
     </div>
   </div>
@@ -400,7 +412,7 @@ export function generateReportHtml(data: ReportData, agencyName: string, agencyE
   <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 48px;background:#F8F9FB;border-top:1.5px solid #E8EAEE;font-size:11px;color:#9ca3af">
     <span>${data.period.startDate} – ${data.period.endDate}</span>
     <span style="font-weight:800;color:#1E2D7D;font-size:13px;letter-spacing:0.02em">#RANKEY</span>
-    <span>${agencyName}${agencyEmail ? " · " + agencyEmail : ""}</span>
+    <span>${esc(agencyName)}${agencyEmail ? " · " + esc(agencyEmail) : ""}</span>
   </div>
 
 </div>

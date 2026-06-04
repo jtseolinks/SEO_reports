@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { exchangeCodeAndSave } from "@/lib/google-oauth";
+import { exchangeCodeAndSave, OAUTH_STATE_COOKIE } from "@/lib/google-oauth";
 
 export async function GET(request: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -12,11 +12,23 @@ export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
   const code = searchParams.get("code");
   const error = searchParams.get("error");
+  const state = searchParams.get("state");
 
   if (error) {
     const redirectUrl = new URL("/admin/google", request.url);
     redirectUrl.searchParams.set("error", error);
     return NextResponse.redirect(redirectUrl);
+  }
+
+  // CSRF protection: the state echoed by Google must match the cookie set when
+  // the flow began.
+  const expectedState = request.cookies.get(OAUTH_STATE_COOKIE)?.value;
+  if (!state || !expectedState || state !== expectedState) {
+    const redirectUrl = new URL("/admin/google", request.url);
+    redirectUrl.searchParams.set("error", "invalid_state");
+    const res = NextResponse.redirect(redirectUrl);
+    res.cookies.delete(OAUTH_STATE_COOKIE);
+    return res;
   }
 
   if (!code) {
@@ -29,7 +41,9 @@ export async function GET(request: NextRequest) {
     await exchangeCodeAndSave(code);
     const redirectUrl = new URL("/admin/google", request.url);
     redirectUrl.searchParams.set("success", "1");
-    return NextResponse.redirect(redirectUrl);
+    const res = NextResponse.redirect(redirectUrl);
+    res.cookies.delete(OAUTH_STATE_COOKIE);
+    return res;
   } catch (err) {
     console.error("Google OAuth callback error:", err);
     const redirectUrl = new URL("/admin/google", request.url);

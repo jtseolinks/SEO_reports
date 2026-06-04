@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { getAgencySettings, saveAgencySettings } from "@/lib/agency-settings";
+import { getAgencySettings, saveAgencySettings, maskSecrets } from "@/lib/agency-settings";
 import { prisma } from "@/lib/prisma";
 
 export async function GET() {
@@ -9,7 +9,7 @@ export async function GET() {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const settings = await getAgencySettings();
-  return NextResponse.json(settings);
+  return NextResponse.json(maskSecrets(settings));
 }
 
 export async function PUT(request: NextRequest) {

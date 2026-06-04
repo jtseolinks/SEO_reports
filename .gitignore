@@ -42,4 +42,5 @@ next-env.d.ts
 
 /lib/generated/
 /public/reports/
+/private/
 *.pdf

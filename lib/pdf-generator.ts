@@ -1,7 +1,6 @@
 import path from "path";
 import fs from "fs/promises";
-
-const REPORTS_DIR = path.join(process.cwd(), "public", "reports");
+import { REPORTS_DIR, reportPublicUrl } from "./report-storage";
 
 async function ensureReportsDir() {
   await fs.mkdir(REPORTS_DIR, { recursive: true });
@@ -34,8 +33,8 @@ export async function generatePdf(
     await browser.close();
   }
 
-  // Return public URL path (relative to /public)
-  return `/reports/${filename}`;
+  // Return the URL path served by the authenticated /reports/[filename] route
+  return reportPublicUrl(filename);
 }
 
 export function buildReportFilename(clientId: string, reportMonth: string): string {
