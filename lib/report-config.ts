@@ -18,7 +18,7 @@ export const DEFAULT_REPORT_CONFIG: ReportConfig = {
   kpi_ctr:         true,
   kpi_position:    true,
   exec_summary:    true,
-  trend_chart:     true,
+  trend_chart:     false,
   ga4_sessions:    true,
   ga4_revenue:     true,
   keywords_table:  true,

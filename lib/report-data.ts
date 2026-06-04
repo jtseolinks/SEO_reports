@@ -190,8 +190,8 @@ export async function buildReportData(
     .sort((a, b) => b.impressions - a.impressions)
     .slice(0, 10);
 
-  // Tracked keyword performance
-  const keywords = client.keywords.map((kw) => {
+  // Tracked keyword performance — the keywords explicitly chosen for the report.
+  const chosenKeywords = client.keywords.map((kw) => {
     const matchFn = kw.matchType === "EXACT"
       ? (q: string) => q === kw.keyword
       : (q: string) => q.includes(kw.keyword);
@@ -221,6 +221,30 @@ export async function buildReportData(
       change: prevPosition > 0 ? prevPosition - position : 0,
     };
   });
+
+  // Default behaviour: if NO non-brand keyword was chosen for the report
+  // (neither by marking a GSC query nor by adding one manually), fall back to
+  // the full general keyword list shown on the client page — every non-brand
+  // GSC query for the period (same 100-row cap as the page), sorted by clicks.
+  const hasChosenKeywords = chosenKeywords.some((k) => !k.isBrand);
+  const keywords = hasChosenKeywords
+    ? chosenKeywords
+    : [...nonBrandQueries]
+        .sort((a, b) => b.clicks - a.clicks)
+        .slice(0, 100)
+        .map((r) => {
+          const prevPosition = prevQueryMap.get(r.query ?? "")?.position ?? 0;
+          return {
+            keyword: r.query ?? "",
+            isBrand: false,
+            clicks: r.clicks,
+            impressions: r.impressions,
+            ctr: r.ctr * 100,
+            position: r.position,
+            prevPosition,
+            change: prevPosition > 0 ? prevPosition - r.position : 0,
+          };
+        });
 
   // GA4 declining pages
   const prevPageMapGa4 = new Map(previousGa4Pages.map((r) => [r.landingPage, r]));

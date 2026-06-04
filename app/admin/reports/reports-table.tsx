@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useTransition } from "react";
+import type { CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Send, Download, Eye, AlertTriangle, Loader2, Trash2, X, Minus } from "lucide-react";
@@ -53,6 +54,21 @@ function ClientAvatar({ name }: { name: string }) {
   );
 }
 
+type StatusFilter = "" | "SENT" | "PENDING" | "FAILED";
+
+// Style for the clickable status count chips above the table.
+function statChipStyle(active: boolean, color: string): CSSProperties {
+  return {
+    display: "inline-flex", alignItems: "center", gap: 4,
+    fontSize: 13.5, fontWeight: 600, color,
+    cursor: "pointer", fontFamily: "inherit",
+    background: active ? "var(--surface-sunken)" : "transparent",
+    border: active ? "1px solid var(--border-strong)" : "1px solid transparent",
+    borderRadius: 999, padding: "3px 10px", lineHeight: 1.4,
+    transition: "background 120ms, border-color 120ms",
+  };
+}
+
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { cls: string; label: string }> = {
     SENT:      { cls: "success", label: "נשלח" },
@@ -88,6 +104,7 @@ export function ReportsTable({ reports: initialReports, months }: { reports: Rep
   const [reports, setReports] = useState(initialReports);
   const [activeMonth, setActiveMonth] = useState(months[0] ?? "");
   const [clientFilter, setClientFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("");
   const [sendingId, setSendingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -102,17 +119,30 @@ export function ReportsTable({ reports: initialReports, months }: { reports: Rep
       .sort((a, b) => a.name.localeCompare(b.name, "he"));
   }, [reports]);
 
-  const filtered = useMemo(() => {
+  // Scope = month + client filters. The status count chips are computed from
+  // this scope so they always show the real totals regardless of which chip is active.
+  const scoped = useMemo(() => {
     let list = activeMonth ? reports.filter(r => r.reportMonth === activeMonth) : reports;
     if (clientFilter) list = list.filter(r => r.clientId === clientFilter);
     return list;
   }, [reports, activeMonth, clientFilter]);
 
+  // What the table renders = scope + the clicked status chip.
+  const filtered = useMemo(() => {
+    if (!statusFilter) return scoped;
+    return scoped.filter(r =>
+      statusFilter === "SENT"    ? r.status === "SENT" :
+      statusFilter === "PENDING" ? (r.status === "DRAFT" || r.status === "GENERATED") :
+      statusFilter === "FAILED"  ? r.status === "FAILED" :
+      true
+    );
+  }, [scoped, statusFilter]);
+
   const stats = {
-    total:   filtered.length,
-    sent:    filtered.filter(r => r.status === "SENT").length,
-    pending: filtered.filter(r => r.status === "DRAFT" || r.status === "GENERATED").length,
-    failed:  filtered.filter(r => r.status === "FAILED").length,
+    total:   scoped.length,
+    sent:    scoped.filter(r => r.status === "SENT").length,
+    pending: scoped.filter(r => r.status === "DRAFT" || r.status === "GENERATED").length,
+    failed:  scoped.filter(r => r.status === "FAILED").length,
   };
 
   async function sendReport(reportId: string) {
@@ -183,7 +213,7 @@ export function ReportsTable({ reports: initialReports, months }: { reports: Rep
     startTransition(() => router.refresh());
   }
 
-  const hasFilters = !!clientFilter;
+  const hasFilters = !!clientFilter || !!statusFilter;
 
   return (
     <div className="page">
@@ -195,7 +225,7 @@ export function ReportsTable({ reports: initialReports, months }: { reports: Rep
         </div>
         <div className="page-head-actions">
           <BulkGenerateButton />
-          <button onClick={() => downloadCsv(filtered)} className="btn btn-secondary">
+          <button onClick={() => downloadCsv(scoped)} className="btn btn-secondary">
             <Download size={14} /> ייצוא הכל
           </button>
         </div>
@@ -243,7 +273,7 @@ export function ReportsTable({ reports: initialReports, months }: { reports: Rep
         </select>
         {hasFilters && (
           <button
-            onClick={() => setClientFilter("")}
+            onClick={() => { setClientFilter(""); setStatusFilter(""); }}
             className="btn btn-ghost sm"
             style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12 }}
           >
@@ -252,14 +282,14 @@ export function ReportsTable({ reports: initialReports, months }: { reports: Rep
         )}
         {hasFilters && (
           <span style={{ fontSize: 12.5, color: "var(--text-muted)" }}>
-            מציג {filtered.length} מתוך {activeMonth ? reports.filter(r => r.reportMonth === activeMonth).length : reports.length}
+            מציג {filtered.length} מתוך {scoped.length}
           </span>
         )}
       </div>
 
-      {/* Stats summary + bulk actions */}
-      {filtered.length > 0 && (
-        <div style={{ display: "flex", gap: 16, marginBottom: 16, fontSize: 13.5, color: "var(--text-muted)", alignItems: "center", flexWrap: "wrap" }}>
+      {/* Stats summary (clickable filters) + bulk actions */}
+      {scoped.length > 0 && (
+        <div style={{ display: "flex", gap: 8, marginBottom: 16, fontSize: 13.5, color: "var(--text-muted)", alignItems: "center", flexWrap: "wrap" }}>
           {selected.size > 0 ? (
             <>
               <span style={{ fontWeight: 600, color: "var(--text)" }}>{selected.size} נבחרו</span>
@@ -273,13 +303,41 @@ export function ReportsTable({ reports: initialReports, months }: { reports: Rep
             </>
           ) : (
             <>
-              <span style={{ fontWeight: 600, color: "var(--text)" }}>{stats.total} נוצרו</span>
+              <button
+                type="button"
+                title="הצג את כל הדוחות"
+                onClick={() => setStatusFilter("")}
+                style={statChipStyle(!statusFilter, "var(--text)")}
+              >
+                {stats.total} נוצרו
+              </button>
               <span style={{ color: "var(--border-strong)" }}>·</span>
-              <span style={{ color: "var(--green)", fontWeight: 600 }}>{stats.sent} נשלחו</span>
+              <button
+                type="button"
+                title="הצג רק דוחות שנשלחו"
+                onClick={() => setStatusFilter(statusFilter === "SENT" ? "" : "SENT")}
+                style={statChipStyle(statusFilter === "SENT", "var(--green)")}
+              >
+                {stats.sent} נשלחו
+              </button>
               <span style={{ color: "var(--border-strong)" }}>·</span>
-              <span style={{ color: "var(--amber)" }}>{stats.pending} ממתינים</span>
+              <button
+                type="button"
+                title="הצג רק דוחות ממתינים"
+                onClick={() => setStatusFilter(statusFilter === "PENDING" ? "" : "PENDING")}
+                style={statChipStyle(statusFilter === "PENDING", "var(--amber)")}
+              >
+                {stats.pending} ממתינים
+              </button>
               <span style={{ color: "var(--border-strong)" }}>·</span>
-              <span style={{ color: "var(--red)" }}>{stats.failed} כשלים</span>
+              <button
+                type="button"
+                title="הצג רק דוחות שנכשלו"
+                onClick={() => setStatusFilter(statusFilter === "FAILED" ? "" : "FAILED")}
+                style={statChipStyle(statusFilter === "FAILED", "var(--red)")}
+              >
+                {stats.failed} כשלים
+              </button>
             </>
           )}
         </div>

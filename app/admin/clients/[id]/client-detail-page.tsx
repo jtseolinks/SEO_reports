@@ -1889,7 +1889,7 @@ function KeywordsPanel({ clientId, hasProperties, brandKeywords, activePeriod, o
           </span>
           <button
             onClick={() => setShowManualInput(v => !v)}
-            className="btn btn-ghost sm"
+            className="btn btn-primary accent sm"
             style={{ fontSize: 11.5, display: "flex", alignItems: "center", gap: 4 }}
           >
             <Plus size={11} /> הוסף ידנית

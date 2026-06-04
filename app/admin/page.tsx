@@ -81,9 +81,20 @@ function DataStatusBadge({ hasProps }: { hasProps: boolean }) {
 
 async function getDashboardData() {
   const now = new Date();
-  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const calendarMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+  // The summary reflects the most recent month that actually has reports
+  // (e.g. it's June but the latest report cycle is May). Falls back to the
+  // current calendar month when no reports exist yet.
+  const latest = await prisma.monthlyReport.findFirst({
+    orderBy: { reportMonth: "desc" },
+    select: { reportMonth: true },
+  });
+  const currentMonth = latest?.reportMonth ?? calendarMonth;
+  const [ay, am] = currentMonth.split("-").map(Number);
+  const currentMonthLabel = new Date(ay, am - 1, 1).toLocaleDateString("he-IL", { month: "long", year: "numeric" });
 
   const [
     totalClients,
@@ -128,10 +139,34 @@ async function getDashboardData() {
   const coveredCount   = sentCount + generatedCount;
   const coveragePct    = totalClients > 0 ? Math.round((coveredCount / totalClients) * 100) : 0;
 
+  // Next scheduled report run (generation + send) across eligible clients —
+  // the nearest upcoming send day among active, auto-send, non-excluded clients.
+  const nextSendDate = (sendDay: number): Date => {
+    let dd = new Date(now.getFullYear(), now.getMonth(), sendDay);
+    if (dd <= now) dd = new Date(now.getFullYear(), now.getMonth() + 1, sendDay);
+    return dd;
+  };
+  const schedulable = clients.filter(
+    (c) => c.status === "ACTIVE" && c.autoSend && !c.excludeFromReports
+  );
+  let nextReport: {
+    date: string; daysUntil: number; collectionDate: string; clientCount: number;
+  } | null = null;
+  if (schedulable.length > 0) {
+    const upcoming = schedulable.map((c) => nextSendDate(c.reportSendDay).getTime());
+    const minTime = Math.min(...upcoming);
+    nextReport = {
+      date: new Date(minTime).toISOString(),
+      daysUntil: Math.max(0, Math.ceil((minTime - now.getTime()) / 86_400_000)),
+      collectionDate: new Date(minTime - 2 * 86_400_000).toISOString(),
+      clientCount: upcoming.filter((t) => t === minTime).length,
+    };
+  }
+
   return {
     totalClients, newThisMonth,
     sentCount, generatedCount, pendingCount, failedCount, coveredCount, coveragePct,
-    clients, recentReports, currentMonth,
+    clients, recentReports, currentMonth, currentMonthLabel, nextReport,
   };
 }
 
@@ -171,8 +206,8 @@ export default async function AdminPage() {
         <div>
           <h1 className="page-title">לוח בקרה</h1>
           <p className="page-sub">
-            סקירה מהירה של החשבונות הלקוחות ומחזור הדוחות החודשי •{" "}
-            {new Date().toLocaleDateString("he-IL", { month: "long", year: "numeric" })}
+            סקירה מהירה של החשבונות הלקוחות •{" "}
+            מחזור דוחות: {d.currentMonthLabel}
             {" "}• שלום, Rankey#
           </p>
         </div>
@@ -254,42 +289,46 @@ export default async function AdminPage() {
         </div>
       </div>
 
-      {/* Activity + Feed row */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 380px", gap: 16, marginBottom: 16 }}>
-
-        {/* Activity summary */}
-        <div className="card">
-          <div className="card-head">
-            <div>
-              <h3 className="card-title">פעילויות חדשות</h3>
-              <p className="card-sub">דוחות שנוצרו ונשלחו ב-30 הימים האחרונים</p>
-            </div>
-          </div>
-          <div className="card-pad" style={{ paddingTop: 0 }}>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 20 }}>
-              <span style={{ fontSize: 48, fontWeight: 700, letterSpacing: "-2px", color: "var(--text)", lineHeight: 1 }}>
-                {d.sentCount + d.generatedCount + d.failedCount}
-              </span>
-              <span style={{ fontSize: 13, color: "var(--text-muted)" }}>מ פעולות מ-30 הימים האחרונים</span>
-            </div>
-            <div style={{ display: "flex", gap: 16 }}>
-              {[
-                { label: "נשלחו", val: d.sentCount, color: "var(--green)" },
-                { label: "מוכנים", val: d.generatedCount, color: "var(--accent)" },
-                { label: "ממתינים", val: d.pendingCount, color: "var(--amber)" },
-                { label: "כשלים", val: d.failedCount, color: "var(--red)" },
-              ].map((s) => (
-                <div key={s.label} style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                  <div style={{ width: 32, height: 4, borderRadius: 2, background: s.color }} />
-                  <span style={{ fontSize: 20, fontWeight: 700, color: s.color }}>{s.val}</span>
-                  <span style={{ fontSize: 11, color: "var(--text-muted)" }}>{s.label}</span>
-                </div>
-              ))}
-            </div>
+      {/* Schedule — next report run across clients */}
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="card-head">
+          <div>
+            <h3 className="card-title">לוח זמנים</h3>
+            <p className="card-sub">מועד יצירת ושליחת מחזור הדוחות הבא ללקוחות</p>
           </div>
         </div>
+        <div className="card-pad" style={{ paddingTop: 4 }}>
+          {d.nextReport ? (
+            <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={{ width: 40, height: 40, borderRadius: 8, background: "var(--accent-soft)", display: "grid", placeItems: "center", flexShrink: 0 }}>
+                  <Clock size={18} style={{ color: "var(--accent)" }} />
+                </div>
+                <div>
+                  <div style={{ fontSize: 12, color: "var(--text-faint)" }}>הדוח הבא</div>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: "var(--text)" }}>
+                    {fmtDate(d.nextReport.date)}
+                  </div>
+                  <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                    בעוד {d.nextReport.daysUntil} ימים · {d.nextReport.clientCount} לקוחות
+                  </div>
+                </div>
+              </div>
+              <div style={{ flex: 1, minWidth: 220, fontSize: 12, color: "var(--text-faint)", padding: "10px 14px", background: "var(--surface-sunken)", borderRadius: "var(--r-sm)" }}>
+                <Clock size={12} style={{ display: "inline", verticalAlign: "middle", marginInlineEnd: 5 }} />
+                איסוף נתונים יתחיל ב-{fmtDate(d.nextReport.collectionDate)} בשעה 22:00
+              </div>
+            </div>
+          ) : (
+            <div style={{ fontSize: 13, color: "var(--text-muted)" }}>
+              אין שליחה אוטומטית מתוזמנת — כל הלקוחות בשליחה ידנית או מוחרגים.
+            </div>
+          )}
+        </div>
+      </div>
 
-        {/* Recent activity feed */}
+      {/* Recent activity feed */}
+      <div style={{ marginBottom: 16 }}>
         <div className="card">
           <div className="card-head">
             <div>
