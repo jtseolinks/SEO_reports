@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { sendReportEmail, getMonthName } from "@/lib/email";
+import { deleteReportFile } from "@/lib/report-storage";
 
 export async function POST(request: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -38,8 +39,11 @@ export async function POST(request: NextRequest) {
 
     await prisma.monthlyReport.update({
       where: { id: reportId },
-      data: { status: "SENT", sentAt: new Date(), emailTo: client.contactEmail, emailCc: client.ccEmails },
+      data: { status: "SENT", sentAt: new Date(), emailTo: client.contactEmail, emailCc: client.ccEmails, pdfUrl: null },
     });
+
+    // Report delivered — the PDF content is no longer needed on disk.
+    await deleteReportFile(report.pdfUrl);
   } catch (err) {
     sendStatus = "failed";
     errorMessage = err instanceof Error ? err.message : String(err);

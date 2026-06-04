@@ -4,6 +4,7 @@ import { buildReportData, getReportPeriods } from "@/lib/report-data";
 import { generateReportHtml } from "@/lib/report-template";
 import { generatePdf, buildReportFilename } from "@/lib/pdf-generator";
 import { sendReportEmail, getMonthName } from "@/lib/email";
+import { deleteReportFile } from "@/lib/report-storage";
 
 type ClientResult = {
   clientId: string;
@@ -19,9 +20,15 @@ function getPreviousMonth(): string {
 }
 
 export async function GET(request: NextRequest) {
-  // Verify CRON_SECRET to prevent unauthorized calls
-  const secret = request.nextUrl.searchParams.get("secret");
-  if (secret !== process.env.CRON_SECRET) {
+  // Verify CRON_SECRET to prevent unauthorized calls. Prefer the Authorization
+  // header (not logged in access logs); fall back to ?secret= for compatibility.
+  const expected = process.env.CRON_SECRET;
+  const authHeader = request.headers.get("authorization");
+  const headerSecret = authHeader?.startsWith("Bearer ")
+    ? authHeader.slice(7)
+    : null;
+  const provided = headerSecret ?? request.nextUrl.searchParams.get("secret");
+  if (!expected || provided !== expected) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -29,11 +36,15 @@ export async function GET(request: NextRequest) {
   const reportMonth = getPreviousMonth();
   const { current, previous } = getReportPeriods(reportMonth);
 
-  // Find all active clients whose send day is today
+  // Find all active clients whose send day is today.
+  // Skip clients explicitly excluded from reports, or with automatic sending
+  // turned off — they must never receive an automatic email.
   const clients = await prisma.client.findMany({
     where: {
       status: "ACTIVE",
       reportSendDay: today,
+      excludeFromReports: false,
+      autoSend: true,
     },
     include: {
       googleProperties: true,
@@ -124,8 +135,12 @@ export async function GET(request: NextRequest) {
           sentAt: new Date(),
           emailTo: client.contactEmail,
           emailCc: client.ccEmails,
+          pdfUrl: null,
         },
       });
+
+      // Report delivered — remove the PDF file, keep only the status record.
+      if (pdfUrl) await deleteReportFile(pdfUrl);
 
       await prisma.reportEmailLog.create({
         data: {
