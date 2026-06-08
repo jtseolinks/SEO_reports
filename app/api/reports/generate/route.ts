@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { requireAgency, requireClientInAgency, toResponse, HttpError } from "@/lib/authz";
 import { buildReportData, getReportPeriods } from "@/lib/report-data";
 import { generateReportHtml } from "@/lib/report-template";
 import { getAgencySettings } from "@/lib/agency-settings";
@@ -11,8 +10,12 @@ import fs from "fs/promises";
 import path from "path";
 
 export async function POST(request: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  let ctx;
+  try {
+    ctx = await requireAgency();
+  } catch (e) {
+    return toResponse(e);
+  }
 
   const { clientId, reportMonth, startDate, endDate } = await request.json();
   if (!clientId || !reportMonth) {
@@ -24,6 +27,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "reportMonth must be YYYY-MM" }, { status: 400 });
   }
 
+  // Verify the client belongs to this agency before creating any report rows.
+  try {
+    await requireClientInAgency(clientId, ctx.agencyId);
+  } catch (e) {
+    return toResponse(e);
+  }
+
   const customDates = startDate && endDate ? { startDate, endDate } : undefined;
   const { current: defaultCurrent, previous } = getReportPeriods(reportMonth);
   const current = customDates
@@ -33,6 +43,7 @@ export async function POST(request: NextRequest) {
   const report = await prisma.monthlyReport.upsert({
     where: { clientId_reportMonth: { clientId, reportMonth } },
     create: {
+      agencyId: ctx.agencyId,
       clientId,
       reportMonth,
       periodStart: new Date(current.startDate),
@@ -52,8 +63,8 @@ export async function POST(request: NextRequest) {
 
   try {
     const [data, agencySettings, clientRow] = await Promise.all([
-      buildReportData(clientId, reportMonth, customDates),
-      getAgencySettings(),
+      buildReportData(ctx.agencyId, clientId, reportMonth, customDates),
+      getAgencySettings(ctx.agencyId),
       prisma.client.findUnique({ where: { id: clientId }, select: { reportConfig: true } }),
     ]);
     const reportCfg = parseReportConfig(clientRow?.reportConfig);
@@ -77,9 +88,8 @@ export async function POST(request: NextRequest) {
     const html = generateReportHtml(data, agencyName, agencyEmail, logoDataUrl, reportCfg);
 
     const filename = buildReportFilename(clientId, reportMonth);
-    const pdfUrl = await generatePdf(html, filename);
+    const pdfUrl = await generatePdf(html, ctx.agencyId, filename);
 
-    const totalImp = data.gsc.impressions.current || 1;
     await prisma.monthlyReport.update({
       where: { id: report.id },
       data: {
@@ -95,6 +105,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, reportId: report.id, pdfUrl });
   } catch (err) {
+    if (err instanceof HttpError) return toResponse(err);
     const errorMessage = err instanceof Error ? err.message : String(err);
     console.error("Report generation error:", err);
 

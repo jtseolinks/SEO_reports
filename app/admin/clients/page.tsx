@@ -3,9 +3,12 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { ClientsTable } from "./clients-table";
+import { requireAgencyPage } from "@/lib/authz";
 
 export default async function ClientsPage() {
+  const ctx = await requireAgencyPage();
   const clients = await prisma.client.findMany({
+    where: { agencyId: ctx.agencyId },
     include: {
       googleProperties: true,
       monthlyReports: {

@@ -1,35 +1,38 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { getAgencySettings, saveAgencySettings, maskSecrets } from "@/lib/agency-settings";
 import { prisma } from "@/lib/prisma";
+import { requireAgency, requireAgencyAdmin, toResponse } from "@/lib/authz";
 
 export async function GET() {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  const settings = await getAgencySettings();
-  return NextResponse.json(maskSecrets(settings));
+  try {
+    const ctx = await requireAgency();
+    const settings = await getAgencySettings(ctx.agencyId);
+    return NextResponse.json(maskSecrets(settings));
+  } catch (e) {
+    return toResponse(e);
+  }
 }
 
 export async function PUT(request: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  try {
+    const ctx = await requireAgencyAdmin();
+    const body = await request.json();
+    const prevSettings = await getAgencySettings(ctx.agencyId);
+    await saveAgencySettings(ctx.agencyId, body);
 
-  const body = await request.json();
-  const prevSettings = await getAgencySettings();
-  await saveAgencySettings(body);
-
-  // When defaultSendDay changes — update all clients that don't have a custom send day
-  if (body.defaultSendDay && body.defaultSendDay !== prevSettings.defaultSendDay) {
-    const newDay = parseInt(body.defaultSendDay, 10);
-    if (!isNaN(newDay) && newDay >= 1 && newDay <= 28) {
-      await prisma.client.updateMany({
-        where: { sendDayCustom: false },
-        data:  { reportSendDay: newDay },
-      });
+    // When defaultSendDay changes — update this agency's clients that don't have a custom send day
+    if (body.defaultSendDay && body.defaultSendDay !== prevSettings.defaultSendDay) {
+      const newDay = parseInt(body.defaultSendDay, 10);
+      if (!isNaN(newDay) && newDay >= 1 && newDay <= 28) {
+        await prisma.client.updateMany({
+          where: { agencyId: ctx.agencyId, sendDayCustom: false },
+          data:  { reportSendDay: newDay },
+        });
+      }
     }
-  }
 
-  return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true });
+  } catch (e) {
+    return toResponse(e);
+  }
 }

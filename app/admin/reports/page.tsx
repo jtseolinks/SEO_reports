@@ -2,9 +2,12 @@ export const dynamic = "force-dynamic";
 
 import { prisma } from "@/lib/prisma";
 import { ReportsTable } from "./reports-table";
+import { requireAgencyPage } from "@/lib/authz";
 
 export default async function ReportsPage() {
+  const ctx = await requireAgencyPage();
   const reports = await prisma.monthlyReport.findMany({
+    where: { agencyId: ctx.agencyId },
     include: {
       client: { select: { id: true, name: true, domain: true } },
       emailLogs: { select: { id: true, status: true } },

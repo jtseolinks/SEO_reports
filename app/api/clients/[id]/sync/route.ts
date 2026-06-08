@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { HttpError, requireAgency, requireClientInAgency, toResponse } from "@/lib/authz";
 import { getAuthenticatedClient } from "@/lib/google-oauth";
 import { fetchGscSummary, aggregateGsc } from "@/lib/gsc-api";
 import { fetchGa4OrganicSummary } from "@/lib/ga4-api";
@@ -10,33 +8,34 @@ import { getReportPeriods } from "@/lib/report-data";
 type Params = { params: Promise<{ id: string }> };
 
 export async function POST(request: NextRequest, { params }: Params) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  const { id } = await params;
-  const { reportMonth, startDate, endDate } = await request.json();
-
-  if (!reportMonth && !(startDate && endDate)) {
-    return NextResponse.json({ error: "reportMonth or startDate+endDate required" }, { status: 400 });
+  let ctx;
+  try {
+    ctx = await requireAgency();
+  } catch (e) {
+    return toResponse(e);
   }
 
-  const client = await prisma.client.findUnique({
-    where: { id },
-    include: { googleProperties: true },
-  });
-
-  if (!client) return NextResponse.json({ error: "Client not found" }, { status: 404 });
-  if (!client.googleProperties) return NextResponse.json({ error: "No Google properties mapped" }, { status: 400 });
-
-  const { gscSiteUrl, ga4PropertyId } = client.googleProperties;
-  const periods = getReportPeriods(reportMonth);
-  const current = startDate && endDate
-    ? { startDate, endDate, label: `${startDate} – ${endDate}` }
-    : periods.current;
-  const previous = periods.previous;
-
   try {
-    const auth = await getAuthenticatedClient();
+    const { id } = await params;
+    const { reportMonth, startDate, endDate } = await request.json();
+
+    if (!reportMonth && !(startDate && endDate)) {
+      return NextResponse.json({ error: "reportMonth or startDate+endDate required" }, { status: 400 });
+    }
+
+    const client = await requireClientInAgency(id, ctx.agencyId, { googleProperties: true });
+    if (!client.googleProperties) {
+      return NextResponse.json({ error: "No Google properties mapped" }, { status: 400 });
+    }
+
+    const { gscSiteUrl, ga4PropertyId } = client.googleProperties;
+    const periods = getReportPeriods(reportMonth);
+    const current = startDate && endDate
+      ? { startDate, endDate, label: `${startDate} – ${endDate}` }
+      : periods.current;
+    const previous = periods.previous;
+
+    const auth = await getAuthenticatedClient(ctx.agencyId);
     if (!auth) return NextResponse.json({ error: "Google not connected" }, { status: 400 });
 
     const hasGa4 = !!ga4PropertyId;
@@ -74,8 +73,9 @@ export async function POST(request: NextRequest, { params }: Params) {
       } : null,
       syncedAt: new Date().toISOString(),
     });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+  } catch (e) {
+    if (e instanceof HttpError) return toResponse(e);
+    const message = e instanceof Error ? e.message : String(e);
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

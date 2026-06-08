@@ -3,25 +3,27 @@ export const dynamic = "force-dynamic";
 import { getGoogleConnection } from "@/lib/google-oauth";
 import { prisma } from "@/lib/prisma";
 import { GoogleConnectionClient } from "./google-connection-client";
+import { requireAgencyPage } from "@/lib/authz";
 
 export default async function GooglePage({
   searchParams,
 }: {
   searchParams: Promise<{ success?: string; error?: string }>;
 }) {
+  const ctx = await requireAgencyPage();
   const [params, connection] = await Promise.all([
     searchParams,
-    getGoogleConnection(),
+    getGoogleConnection(ctx.agencyId),
   ]);
 
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
   const [monitoredCount, ga4Count, gscCount, emailsSentThisMonth] = await Promise.all([
-    prisma.client.count({ where: { googleProperties: { isNot: null } } }),
-    prisma.clientGoogleProperty.count({ where: { ga4PropertyId: { not: "" } } }),
-    prisma.clientGoogleProperty.count(),
-    prisma.reportEmailLog.count({ where: { createdAt: { gte: startOfMonth } } }),
+    prisma.client.count({ where: { agencyId: ctx.agencyId, googleProperties: { isNot: null } } }),
+    prisma.clientGoogleProperty.count({ where: { client: { agencyId: ctx.agencyId }, ga4PropertyId: { not: "" } } }),
+    prisma.clientGoogleProperty.count({ where: { client: { agencyId: ctx.agencyId } } }),
+    prisma.reportEmailLog.count({ where: { agencyId: ctx.agencyId, createdAt: { gte: startOfMonth } } }),
   ]);
 
   return (

@@ -3,28 +3,40 @@ import fs from "fs/promises";
 
 // Generated PDF reports are stored OUTSIDE the public directory so they are
 // never served as unauthenticated static files. They are streamed only through
-// the authenticated route at /reports/[filename].
+// the authenticated route at /reports/[agencyId]/[filename]. Files are
+// namespaced per agency so one tenant can never reference another's PDFs.
 export const REPORTS_DIR = path.join(process.cwd(), "private", "reports");
 
-// Public URL path used in the DB (pdfUrl) and the admin UI. It is handled by
-// the authenticated route handler, not by static file serving.
-export function reportPublicUrl(filename: string): string {
-  return `/reports/${filename}`;
+// Public URL path used in the DB (pdfUrl) and the admin UI. Handled by the
+// authenticated route handler, not by static file serving.
+export function reportPublicUrl(agencyId: string, filename: string): string {
+  return `/reports/${agencyId}/${filename}`;
 }
 
-// Resolve a stored pdfUrl (or filename) to an absolute path on disk.
-// Uses basename() to strip any directory component → prevents path traversal.
-export function reportFilePath(pdfUrlOrName: string): string {
-  const filename = path.basename(pdfUrlOrName);
-  return path.join(REPORTS_DIR, filename);
+// Resolve an (agencyId, filename) pair to an absolute path on disk.
+// basename() on both segments prevents path traversal.
+export function reportFilePath(agencyId: string, filename: string): string {
+  return path.join(REPORTS_DIR, path.basename(agencyId), path.basename(filename));
 }
 
-// Delete a generated PDF from disk. Used after a report is delivered to the
-// client — the file is no longer needed and only the status record is kept.
-// Missing files are ignored.
-export async function deleteReportFile(pdfUrlOrName: string): Promise<void> {
+// Resolve a stored pdfUrl ("/reports/<agencyId>/<file>") to an absolute path.
+export function reportFilePathFromUrl(pdfUrl: string): string {
+  const parts = pdfUrl.split("/").filter(Boolean); // ["reports", agencyId, file]
+  const filename = parts[parts.length - 1] ?? "";
+  const agencyId = parts.length >= 3 ? parts[parts.length - 2] : "";
+  return reportFilePath(agencyId, filename);
+}
+
+// Directory holding one agency's report PDFs.
+export function agencyReportsDir(agencyId: string): string {
+  return path.join(REPORTS_DIR, path.basename(agencyId));
+}
+
+// Delete a generated PDF from disk (by its stored pdfUrl). Used after a report
+// is delivered. Missing files are ignored.
+export async function deleteReportFile(pdfUrl: string): Promise<void> {
   try {
-    await fs.unlink(reportFilePath(pdfUrlOrName));
+    await fs.unlink(reportFilePathFromUrl(pdfUrl));
   } catch {
     // File already gone or never existed — nothing to do.
   }

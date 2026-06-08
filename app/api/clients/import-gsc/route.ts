@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { requireAgency, toResponse } from "@/lib/authz";
 
 type ImportSite = {
   siteUrl: string;
@@ -18,8 +17,12 @@ function deriveDomain(siteUrl: string): string {
 }
 
 export async function POST(request: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  let ctx;
+  try {
+    ctx = await requireAgency();
+  } catch (e) {
+    return toResponse(e);
+  }
 
   const { sites }: { sites: ImportSite[] } = await request.json();
   const results = [];
@@ -27,7 +30,8 @@ export async function POST(request: NextRequest) {
   for (const site of sites) {
     const domain = deriveDomain(site.siteUrl);
 
-    const existing = await prisma.client.findFirst({ where: { domain } });
+    // Duplicate check scoped to this agency only.
+    const existing = await prisma.client.findFirst({ where: { domain, agencyId: ctx.agencyId } });
     if (existing) {
       results.push({ siteUrl: site.siteUrl, status: "skipped", reason: "Already exists" });
       continue;
@@ -35,6 +39,7 @@ export async function POST(request: NextRequest) {
 
     const client = await prisma.client.create({
       data: {
+        agencyId: ctx.agencyId,
         name: site.name || domain,
         domain,
         contactEmail: "",

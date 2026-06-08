@@ -1,10 +1,10 @@
 import nodemailer from "nodemailer";
 import fs from "fs/promises";
 import { getAgencySettings } from "./agency-settings";
-import { reportFilePath } from "./report-storage";
+import { reportFilePathFromUrl } from "./report-storage";
 
-async function createTransport() {
-  const s = await getAgencySettings();
+async function createTransport(agencyId: string) {
+  const s = await getAgencySettings(agencyId);
   const host = s.smtpHost || process.env.SMTP_HOST;
   const port = parseInt(s.smtpPort || process.env.SMTP_PORT || "587");
   const user = s.smtpUser || process.env.SMTP_USER;
@@ -21,11 +21,12 @@ async function createTransport() {
 }
 
 export type SendReportEmailParams = {
+  agencyId: string;
   to: string;
   cc?: string[];
   clientName: string;
   monthName: string;
-  pdfUrl: string; // e.g. /reports/report_xxx.pdf (served by the authenticated route)
+  pdfUrl: string; // e.g. /reports/<agencyId>/report_xxx.pdf (served by the authenticated route)
 };
 
 function buildEmailSubject(clientName: string, monthName: string): string {
@@ -43,14 +44,14 @@ function applyTemplateVars(template: string, vars: Record<string, string>): stri
 }
 
 export async function sendReportEmail(params: SendReportEmailParams): Promise<string> {
-  const { to, cc = [], clientName, monthName, pdfUrl } = params;
-  const s = await getAgencySettings();
+  const { agencyId, to, cc = [], clientName, monthName, pdfUrl } = params;
+  const s = await getAgencySettings(agencyId);
   const agencyName = s.agencyName || process.env.AGENCY_NAME || "SEO Agency";
   const fromName   = s.emailSenderName  || agencyName;
   const fromEmail  = s.emailSenderEmail || process.env.SMTP_FROM || "noreply@example.com";
 
   // Resolve the PDF file path on disk (private reports dir, not /public)
-  const pdfFilePath = reportFilePath(pdfUrl);
+  const pdfFilePath = reportFilePathFromUrl(pdfUrl);
   const pdfBuffer = await fs.readFile(pdfFilePath);
   const pdfFilename = pdfFilePath.split(/[\\/]/).pop() ?? "report.pdf";
 
@@ -84,7 +85,7 @@ export async function sendReportEmail(params: SendReportEmailParams): Promise<st
     });
   }
 
-  const transporter = await createTransport();
+  const transporter = await createTransport(agencyId);
 
   const info = await transporter.sendMail({
     from: `${fromName} <${fromEmail}>`,
@@ -106,12 +107,12 @@ export async function sendReportEmail(params: SendReportEmailParams): Promise<st
   return info.messageId ?? "";
 }
 
-export async function sendTestEmail(to: string): Promise<string> {
-  const s = await getAgencySettings();
+export async function sendTestEmail(agencyId: string, to: string): Promise<string> {
+  const s = await getAgencySettings(agencyId);
   const agencyName = s.agencyName || process.env.AGENCY_NAME || "SEO Agency";
   const fromName   = s.emailSenderName  || agencyName;
   const fromEmail  = s.emailSenderEmail || process.env.SMTP_FROM || "noreply@example.com";
-  const transporter = await createTransport();
+  const transporter = await createTransport(agencyId);
 
   const info = await transporter.sendMail({
     from: `${fromName} <${fromEmail}>`,

@@ -1,32 +1,36 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { requireAgency, toResponse } from "@/lib/authz";
 import { buildFakeReportData } from "@/lib/report-fake-data";
 import { generateReportHtml } from "@/lib/report-template";
 import { generatePdf, buildReportFilename } from "@/lib/pdf-generator";
 import { sendReportEmail } from "@/lib/email";
-import { prisma } from "@/lib/prisma";
+import { getAgencySettings } from "@/lib/agency-settings";
 
 export async function POST(request: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  let ctx;
+  try {
+    ctx = await requireAgency();
+  } catch (e) {
+    return toResponse(e);
+  }
 
   const { sendEmail } = await request.json().catch(() => ({ sendEmail: false }));
 
-  const agencyName = process.env.AGENCY_NAME ?? "SEO Agency";
-  const agencyEmail = process.env.AGENCY_EMAIL ?? "";
+  const settings = await getAgencySettings(ctx.agencyId);
+  const agencyName = settings.agencyName || process.env.AGENCY_NAME || "SEO Agency";
+  const agencyEmail = settings.contactEmail || process.env.AGENCY_EMAIL || "";
 
   const data = buildFakeReportData();
   const html = generateReportHtml(data, agencyName, agencyEmail);
   const filename = buildReportFilename("test", `test-${Date.now()}`);
-  const pdfUrl = await generatePdf(html, filename);
+  const pdfUrl = await generatePdf(html, ctx.agencyId, filename);
 
   if (sendEmail) {
-    const adminUser = await prisma.user.findFirst({ where: { role: "ADMIN" } });
-    const to = adminUser?.email ?? session.user?.email ?? "";
+    const to = ctx.email;
     if (!to) return NextResponse.json({ error: "No admin email found" }, { status: 400 });
 
     await sendReportEmail({
+      agencyId: ctx.agencyId,
       to,
       cc: [],
       clientName: "Example Client (TEST)",

@@ -1,22 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { requireAgency, toResponse } from "@/lib/authz";
 import { sendReportEmail, getMonthName } from "@/lib/email";
 
 type Params = { params: Promise<{ id: string }> };
 
 export async function POST(request: NextRequest, { params }: Params) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  let ctx;
+  try {
+    ctx = await requireAgency();
+  } catch (e) {
+    return toResponse(e);
+  }
 
   const { to } = await request.json();
   if (!to) return NextResponse.json({ error: "to is required" }, { status: 400 });
 
   const { id } = await params;
 
-  const report = await prisma.monthlyReport.findUnique({
-    where: { id },
+  const report = await prisma.monthlyReport.findFirst({
+    where: { id, agencyId: ctx.agencyId },
     include: { client: true },
   });
 
@@ -26,6 +29,7 @@ export async function POST(request: NextRequest, { params }: Params) {
   const monthName = getMonthName(report.reportMonth);
 
   const messageId = await sendReportEmail({
+    agencyId: ctx.agencyId,
     to,
     cc: [],
     clientName: report.client.name,

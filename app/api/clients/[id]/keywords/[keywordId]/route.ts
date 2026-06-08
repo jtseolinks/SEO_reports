@@ -1,34 +1,42 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { requireAgency, requireClientInAgency, toResponse } from "@/lib/authz";
 
 type Params = { params: Promise<{ id: string; keywordId: string }> };
 
 export async function DELETE(_req: NextRequest, { params }: Params) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  const { keywordId } = await params;
-  await prisma.clientKeyword.delete({ where: { id: keywordId } });
-  return NextResponse.json({ success: true });
+  try {
+    const ctx = await requireAgency();
+    const { id, keywordId } = await params;
+    await requireClientInAgency(id, ctx.agencyId);
+    // Scope by clientId so a keywordId from another client can't be deleted.
+    await prisma.clientKeyword.deleteMany({ where: { id: keywordId, clientId: id } });
+    return NextResponse.json({ success: true });
+  } catch (e) {
+    return toResponse(e);
+  }
 }
 
 export async function PUT(request: NextRequest, { params }: Params) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  try {
+    const ctx = await requireAgency();
+    const { id, keywordId } = await params;
+    await requireClientInAgency(id, ctx.agencyId);
 
-  const { keywordId } = await params;
-  const { groupName, isBrand, matchType, isActive } = await request.json();
+    const { groupName, isBrand, matchType, isActive } = await request.json();
 
-  const kw = await prisma.clientKeyword.update({
-    where: { id: keywordId },
-    data: {
-      ...(groupName !== undefined && { groupName }),
-      ...(isBrand !== undefined && { isBrand }),
-      ...(matchType !== undefined && { matchType }),
-      ...(isActive !== undefined && { isActive }),
-    },
-  });
-  return NextResponse.json(kw);
+    const result = await prisma.clientKeyword.updateMany({
+      where: { id: keywordId, clientId: id },
+      data: {
+        ...(groupName !== undefined && { groupName }),
+        ...(isBrand !== undefined && { isBrand }),
+        ...(matchType !== undefined && { matchType }),
+        ...(isActive !== undefined && { isActive }),
+      },
+    });
+    if (result.count === 0) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    return NextResponse.json({ success: true });
+  } catch (e) {
+    return toResponse(e);
+  }
 }

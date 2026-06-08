@@ -98,8 +98,8 @@ function defaults(): AgencySettings {
 // Returns settings with secrets DECRYPTED (real values), for internal/server use
 // such as sending email. Never return this object directly to the client — use
 // maskSecrets() for that.
-export async function getAgencySettings(): Promise<AgencySettings> {
-  const rows = await prisma.agencySetting.findMany({ where: { key: { in: KEYS } } });
+export async function getAgencySettings(agencyId: string): Promise<AgencySettings> {
+  const rows = await prisma.agencySetting.findMany({ where: { agencyId, key: { in: KEYS } } });
   const map  = Object.fromEntries(rows.map(r => [r.key, r.value]));
   const d    = defaults();
   return KEYS.reduce((acc, k) => {
@@ -120,7 +120,10 @@ export function maskSecrets(settings: AgencySettings): AgencySettings {
   return masked;
 }
 
-export async function saveAgencySettings(settings: Partial<AgencySettings>): Promise<void> {
+export async function saveAgencySettings(
+  agencyId: string,
+  settings: Partial<AgencySettings>
+): Promise<void> {
   await Promise.all(
     Object.entries(settings)
       // Whitelist: only known keys may be written (prevents storage pollution).
@@ -133,8 +136,8 @@ export async function saveAgencySettings(settings: Partial<AgencySettings>): Pro
           ? encrypt(raw)
           : raw;
         return prisma.agencySetting.upsert({
-          where:  { key },
-          create: { key, value: stored },
+          where:  { agencyId_key: { agencyId, key } },
+          create: { agencyId, key, value: stored },
           update: { value: stored },
         });
       })

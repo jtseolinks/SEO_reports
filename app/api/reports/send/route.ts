@@ -1,19 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { requireAgency, toResponse } from "@/lib/authz";
 import { sendReportEmail, getMonthName } from "@/lib/email";
 import { deleteReportFile } from "@/lib/report-storage";
 
 export async function POST(request: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  let ctx;
+  try {
+    ctx = await requireAgency();
+  } catch (e) {
+    return toResponse(e);
+  }
 
   const { reportId } = await request.json();
   if (!reportId) return NextResponse.json({ error: "reportId is required" }, { status: 400 });
 
-  const report = await prisma.monthlyReport.findUnique({
-    where: { id: reportId },
+  const report = await prisma.monthlyReport.findFirst({
+    where: { id: reportId, agencyId: ctx.agencyId },
     include: { client: true },
   });
 
@@ -30,6 +33,7 @@ export async function POST(request: NextRequest) {
 
   try {
     messageId = await sendReportEmail({
+      agencyId: ctx.agencyId,
       to: client.contactEmail,
       cc: client.ccEmails,
       clientName: client.name,
@@ -53,6 +57,7 @@ export async function POST(request: NextRequest) {
   // Log delivery
   await prisma.reportEmailLog.create({
     data: {
+      agencyId: ctx.agencyId,
       reportId,
       clientId: client.id,
       emailTo: client.contactEmail,

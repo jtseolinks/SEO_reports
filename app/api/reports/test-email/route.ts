@@ -1,17 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { requireAgencyAdmin, toResponse } from "@/lib/authz";
 import { sendTestEmail } from "@/lib/email";
 
 export async function POST(request: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  let ctx;
+  try {
+    ctx = await requireAgencyAdmin();
+  } catch (e) {
+    return toResponse(e);
+  }
 
   const { to } = await request.json();
   if (!to) return NextResponse.json({ error: "to is required" }, { status: 400 });
 
   try {
-    const messageId = await sendTestEmail(to);
+    const messageId = await sendTestEmail(ctx.agencyId, to);
     return NextResponse.json({ success: true, messageId });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

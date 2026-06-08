@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getAuthenticatedClient } from "@/lib/google-oauth";
+import { requireAgency, toResponse } from "@/lib/authz";
+import { getGoogleConnection, getAuthenticatedClient } from "@/lib/google-oauth";
 import { listGscSites } from "@/lib/gsc-api";
 
 export type Notification = {
@@ -16,15 +15,17 @@ export type Notification = {
 };
 
 export async function GET() {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  let ctx;
+  try {
+    ctx = await requireAgency();
+  } catch (e) {
+    return toResponse(e);
+  }
 
   const notes: Notification[] = [];
 
   // ── 1. Google connection status ──────────────────────────────────────────────
-  const connection = await prisma.googleConnection.findFirst({
-    orderBy: { createdAt: "desc" },
-  });
+  const connection = await getGoogleConnection(ctx.agencyId);
 
   if (!connection) {
     notes.push({
@@ -58,9 +59,10 @@ export async function GET() {
   // ── 2. Fetch all client properties + GSC site list in parallel ───────────────
   const [allProperties, auth] = await Promise.all([
     prisma.clientGoogleProperty.findMany({
+      where: { client: { agencyId: ctx.agencyId } },
       include: { client: { select: { id: true, name: true, status: true } } },
     }),
-    getAuthenticatedClient(),
+    getAuthenticatedClient(ctx.agencyId),
   ]);
 
   // Build a set of sites the Google account actually has access to
@@ -106,6 +108,7 @@ export async function GET() {
   // ── 3. Clients with no Google properties at all ───────────────────────────────
   const noPropsClients = await prisma.client.findMany({
     where: {
+      agencyId: ctx.agencyId,
       status: "ACTIVE",
       googleProperties: null,
       createdAt: { lte: new Date(Date.now() - 3 * 86_400_000) },
@@ -127,6 +130,7 @@ export async function GET() {
   // ── 4. Recently failed reports ────────────────────────────────────────────────
   const failedReports = await prisma.monthlyReport.findMany({
     where: {
+      agencyId: ctx.agencyId,
       status: "FAILED",
       updatedAt: { gte: new Date(Date.now() - 14 * 86_400_000) },
     },
