@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
-import { requireAgencyAdmin, toResponse } from "@/lib/authz";
+import { requireAgencyAdmin, toResponse, HttpError } from "@/lib/authz";
 import type { MembershipRole } from "@/lib/generated/prisma/client";
 
 function toMembershipRole(role?: string): MembershipRole {
@@ -42,6 +42,12 @@ export async function POST(req: NextRequest) {
 
     if (!email) return NextResponse.json({ error: "email required" }, { status: 400 });
 
+    // Only OWNER can add members with ADMIN or OWNER role.
+    const assignedRole = toMembershipRole(role);
+    if ((assignedRole === "ADMIN" || assignedRole === "OWNER") && ctx.role !== "OWNER") {
+      throw new HttpError(403, "רק הבעלים יכול להוסיף מנהלים");
+    }
+
     let user = await prisma.user.findUnique({ where: { email } });
     if (!user) {
       if (!password) {
@@ -60,11 +66,11 @@ export async function POST(req: NextRequest) {
     }
 
     await prisma.membership.create({
-      data: { userId: user.id, agencyId: ctx.agencyId, role: toMembershipRole(role) },
+      data: { userId: user.id, agencyId: ctx.agencyId, role: assignedRole },
     });
 
     return NextResponse.json(
-      { user: { id: user.id, email: user.email, name: user.name, role: toMembershipRole(role) } },
+      { user: { id: user.id, email: user.email, name: user.name, role: assignedRole } },
       { status: 201 }
     );
   } catch (e) {

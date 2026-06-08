@@ -79,6 +79,7 @@ export const authOptions: NextAuthOptions = {
           email: user.email,
           name: user.name ?? undefined,
           role: user.role,
+          isSuperAdmin: user.isSuperAdmin,
           agencyId,
           membershipRole,
         };
@@ -106,6 +107,7 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.id = user.id;
         token.role = (user as { role: string }).role;
+        token.isSuperAdmin = (user as { isSuperAdmin?: boolean }).isSuperAdmin ?? false;
         token.agencyId = (user as { agencyId?: string | null }).agencyId ?? null;
         token.membershipRole =
           (user as { membershipRole?: MembershipRole | null }).membershipRole ?? null;
@@ -146,6 +148,7 @@ export const authOptions: NextAuthOptions = {
       if (session.user) {
         session.user.id = token.id as string;
         session.user.role = token.role as string;
+        session.user.isSuperAdmin = (token.isSuperAdmin as boolean) ?? false;
         session.user.agencyId = (token.agencyId as string | null) ?? null;
         session.user.membershipRole = (token.membershipRole as MembershipRole | null) ?? null;
         session.user.memberships = token.memberships ?? [];

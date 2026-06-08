@@ -11,6 +11,7 @@ declare module "next-auth" {
       email: string;
       name?: string;
       role: string;
+      isSuperAdmin: boolean;
       // Active agency (tenant) for this session — null if the user has no membership.
       agencyId: string | null;
       membershipRole: MembershipRole | null;
@@ -24,6 +25,7 @@ declare module "next-auth" {
     email: string;
     name?: string;
     role: string;
+    isSuperAdmin?: boolean;
     agencyId?: string | null;
     membershipRole?: MembershipRole | null;
   }
@@ -33,6 +35,7 @@ declare module "next-auth/jwt" {
   interface JWT {
     id: string;
     role: string;
+    isSuperAdmin: boolean;
     agencyId: string | null;
     membershipRole: MembershipRole | null;
     // Cached at login — avoids DB hit on every /api/auth/session call.

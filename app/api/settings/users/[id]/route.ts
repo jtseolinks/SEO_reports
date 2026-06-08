@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAgencyAdmin, toResponse } from "@/lib/authz";
+import { requireAgencyAdmin, toResponse, HttpError } from "@/lib/authz";
 import type { MembershipRole } from "@/lib/generated/prisma/client";
 
 type Params = { params: Promise<{ id: string }> };
 
-// Remove a member from the active agency (does not delete the global user).
+/**
+ * Remove a member from the active agency.
+ * - ADMIN: can only remove MEMBERs.
+ * - OWNER: can remove ADMIN or MEMBER (not themselves, not the last OWNER).
+ */
 export async function DELETE(_req: NextRequest, { params }: Params) {
   try {
     const ctx = await requireAgencyAdmin();
@@ -15,19 +19,43 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "לא ניתן להסיר את עצמך" }, { status: 400 });
     }
 
-    const result = await prisma.membership.deleteMany({
-      where: { userId: id, agencyId: ctx.agencyId },
+    const target = await prisma.membership.findUnique({
+      where: { userId_agencyId: { userId: id, agencyId: ctx.agencyId } },
     });
-    if (result.count === 0) {
-      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    if (!target) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+    // ADMIN cannot remove other ADMINs or the OWNER.
+    if (ctx.role !== "OWNER" && (target.role === "ADMIN" || target.role === "OWNER")) {
+      throw new HttpError(403, "רק הבעלים יכול להסיר מנהלים");
     }
+
+    // Prevent removing the last OWNER.
+    if (target.role === "OWNER") {
+      const ownerCount = await prisma.membership.count({
+        where: { agencyId: ctx.agencyId, role: "OWNER" },
+      });
+      if (ownerCount <= 1) {
+        return NextResponse.json(
+          { error: "לא ניתן להסיר את הבעלים האחרון של הסוכנות" },
+          { status: 400 }
+        );
+      }
+    }
+
+    await prisma.membership.delete({
+      where: { userId_agencyId: { userId: id, agencyId: ctx.agencyId } },
+    });
     return NextResponse.json({ success: true });
   } catch (e) {
     return toResponse(e);
   }
 }
 
-// Update a member: name/email on the user, role on the membership (scoped to agency).
+/**
+ * Update a member: name/email on the user, role on the membership.
+ * - Role changes (to/from ADMIN or OWNER): OWNER only.
+ * - Name/email edits: OWNER or ADMIN.
+ */
 export async function PATCH(req: NextRequest, { params }: Params) {
   try {
     const ctx = await requireAgencyAdmin();
@@ -36,11 +64,34 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       name?: string; email?: string; role?: string;
     };
 
-    // The target must be a member of the active agency.
     const membership = await prisma.membership.findUnique({
       where: { userId_agencyId: { userId: id, agencyId: ctx.agencyId } },
     });
     if (!membership) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+    // Role change rules — only OWNER can promote/demote.
+    const newRole =
+      role === "OWNER" || role === "ADMIN" || role === "MEMBER"
+        ? (role as MembershipRole)
+        : membership.role;
+
+    if (newRole !== membership.role) {
+      if (ctx.role !== "OWNER") {
+        throw new HttpError(403, "רק הבעלים יכול לשנות תפקידים");
+      }
+      // Prevent demoting the last OWNER.
+      if (membership.role === "OWNER" && newRole !== "OWNER") {
+        const ownerCount = await prisma.membership.count({
+          where: { agencyId: ctx.agencyId, role: "OWNER" },
+        });
+        if (ownerCount <= 1) {
+          return NextResponse.json(
+            { error: "לא ניתן לשנות תפקיד הבעלים האחרון — העבר בעלות תחילה" },
+            { status: 400 }
+          );
+        }
+      }
+    }
 
     if (email) {
       const conflict = await prisma.user.findUnique({ where: { email } });
@@ -56,9 +107,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       });
     }
 
-    let newRole = membership.role;
-    if (role === "OWNER" || role === "ADMIN" || role === "MEMBER") {
-      newRole = role as MembershipRole;
+    if (newRole !== membership.role) {
       await prisma.membership.update({
         where: { userId_agencyId: { userId: id, agencyId: ctx.agencyId } },
         data: { role: newRole },

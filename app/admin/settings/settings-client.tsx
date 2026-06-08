@@ -724,7 +724,8 @@ type InviteRecord = { id: string; email: string; role: string; status: string; e
 
 const ROLE_LABELS: Record<string, string> = { OWNER: "בעלים", ADMIN: "מנהל", MEMBER: "חבר צוות" };
 
-function TeamSection() {
+function TeamSection({ currentUserRole }: { currentUserRole: string }) {
+  const isOwner = currentUserRole === "OWNER";
   const [users, setUsers]       = useState<TeamUser[]>([]);
   const [loading, setLoading]   = useState(true);
   const [addOpen, setAddOpen]   = useState(false);
@@ -869,11 +870,14 @@ function TeamSection() {
             style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
             <Mail size={13} /> הזמן משתמש
           </button>
-          <button onClick={() => { setAddOpen(o => !o); setAddErr(""); setInviteOpen(false); }}
-            className="btn btn-secondary sm"
-            style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-            <Plus size={13} /> הוסף ישיר
-          </button>
+          {/* Direct add: OWNER only — bypasses invite flow */}
+          {isOwner && (
+            <button onClick={() => { setAddOpen(o => !o); setAddErr(""); setInviteOpen(false); }}
+              className="btn btn-secondary sm"
+              style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+              <Plus size={13} /> הוסף ישיר
+            </button>
+          )}
         </div>
       </div>
 
@@ -894,7 +898,8 @@ function TeamSection() {
               <label className="field-label">תפקיד</label>
               <select className="rk-input" value={inviteRole} onChange={e => setInviteRole(e.target.value)}
                 style={{ fontFamily: "inherit" }}>
-                <option value="ADMIN">מנהל</option>
+                {/* Only OWNER can invite an ADMIN */}
+                {isOwner && <option value="ADMIN">מנהל</option>}
                 <option value="MEMBER">חבר צוות</option>
               </select>
             </div>
@@ -1021,11 +1026,12 @@ function TeamSection() {
                       )}
                     </td>
                     <td>
-                      {isEditing ? (
+                      {isEditing && isOwner ? (
                         <select className="rk-input" value={editRole} onChange={e => setEditRole(e.target.value)}
                           style={{ fontSize: 12, padding: "4px 8px" }}>
+                          <option value="OWNER">בעלים</option>
                           <option value="ADMIN">מנהל</option>
-                          <option value="VIEWER">צופה</option>
+                          <option value="MEMBER">חבר צוות</option>
                         </select>
                       ) : (
                         <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, background: "var(--accent-soft)", color: "var(--accent)", borderRadius: "var(--r-pill)", padding: "2px 8px" }}>
@@ -1054,13 +1060,19 @@ function TeamSection() {
                           </>
                         ) : (
                           <>
-                            <button onClick={() => startEdit(u)} className="iconbtn" title="עריכה">
-                              <Pencil size={13} />
-                            </button>
-                            <button onClick={() => removeUser(u.id)} disabled={deleting === u.id}
-                              className="iconbtn" title="מחק משתמש" style={{ color: "var(--red)" }}>
-                              {deleting === u.id ? <Loader2 size={13} className="animate-spin" /> : <X size={13} />}
-                            </button>
+                            {/* Edit button: OWNER can edit anyone; ADMIN can only edit MEMBERs */}
+                            {(isOwner || u.role === "MEMBER") && (
+                              <button onClick={() => startEdit(u)} className="iconbtn" title="עריכה">
+                                <Pencil size={13} />
+                              </button>
+                            )}
+                            {/* Remove button: OWNER can remove ADMIN/MEMBER; ADMIN can only remove MEMBERs */}
+                            {(isOwner || u.role === "MEMBER") && (
+                              <button onClick={() => removeUser(u.id)} disabled={deleting === u.id}
+                                className="iconbtn" title="הסר מהצוות" style={{ color: "var(--red)" }}>
+                                {deleting === u.id ? <Loader2 size={13} className="animate-spin" /> : <X size={13} />}
+                              </button>
+                            )}
                           </>
                         )}
                       </div>
@@ -1122,7 +1134,13 @@ function TeamSection() {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export function SettingsClient({ initialSettings }: { initialSettings: AgencySettings }) {
+export function SettingsClient({
+  initialSettings,
+  currentUserRole,
+}: {
+  initialSettings: AgencySettings;
+  currentUserRole: string;
+}) {
   const router = useRouter();
   const [, startTransition] = useTransition();
 
@@ -1234,7 +1252,7 @@ export function SettingsClient({ initialSettings }: { initialSettings: AgencySet
           {activeSection === "branding"  && <BrandingSection  {...sectionProps} />}
           {activeSection === "email"     && <EmailSection     {...sectionProps} />}
           {activeSection === "schedule"  && <ScheduleSection  {...sectionProps} />}
-          {activeSection === "team"      && <TeamSection />}
+          {activeSection === "team"      && <TeamSection currentUserRole={currentUserRole} />}
         </div>
       </div>
     </div>

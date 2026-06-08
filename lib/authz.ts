@@ -59,6 +59,32 @@ export async function requireAgencyAdmin(): Promise<AgencyContext> {
 }
 
 /**
+ * Like requireAgencyAdmin but restricted to OWNER only.
+ * Use for destructive / privileged workspace operations:
+ * promoting members to ADMIN, removing ADMINs, transferring ownership.
+ */
+export async function requireAgencyOwner(): Promise<AgencyContext> {
+  const ctx = await requireAgency();
+  if (ctx.role !== "OWNER") {
+    throw new HttpError(403, "Workspace owner role required");
+  }
+  return ctx;
+}
+
+export type SuperAdminContext = { userId: string; email: string };
+
+/**
+ * Requires the isSuperAdmin flag — cross-agency platform admin.
+ * Independent of agency membership; the user may have no active agency.
+ */
+export async function requireSuperAdmin(): Promise<SuperAdminContext> {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) throw new HttpError(401, "Unauthorized");
+  if (!session.user.isSuperAdmin) throw new HttpError(403, "Super-admin access required");
+  return { userId: session.user.id, email: session.user.email };
+}
+
+/**
  * Load a client by id ONLY if it belongs to the given agency. Uses findFirst
  * (not findUnique) so agencyId can be part of the filter, and returns 404 — not
  * 403 — so a client's existence is never leaked across tenants.

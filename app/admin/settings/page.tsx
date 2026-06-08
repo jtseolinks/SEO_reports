@@ -8,5 +8,5 @@ export default async function SettingsPage() {
   const ctx = await requireAgencyPage();
   // Mask secrets (e.g. smtpPass) before handing settings to the client component.
   const settings = maskSecrets(await getAgencySettings(ctx.agencyId));
-  return <SettingsClient initialSettings={settings} />;
+  return <SettingsClient initialSettings={settings} currentUserRole={ctx.role} />;
 }

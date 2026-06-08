@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import {
-  LayoutDashboard, Users, FileText, Plug, Settings, ChevronDown,
+  LayoutDashboard, Users, FileText, Plug, Settings, ChevronDown, ShieldAlert,
 } from "lucide-react";
 import { HashMark } from "@/components/brand/hash-mark";
 
@@ -85,6 +85,21 @@ export function Sidebar({ counts }: { counts?: Counts }) {
           </Link>
         );
       })}
+
+      {/* Super-admin link (platform admins only) */}
+      {session?.user?.isSuperAdmin && (
+        <>
+          <div className="nav-section-label">פלטפורמה</div>
+          <Link
+            href="/super-admin"
+            className={`nav-item${pathname.startsWith("/super-admin") ? " active" : ""}`}
+            style={{ color: "var(--brand-cyan)" }}
+          >
+            <ShieldAlert size={16} className="nav-icon" style={{ color: "var(--brand-cyan)" }} />
+            <span>Super Admin</span>
+          </Link>
+        </>
+      )}
 
       {/* Footer */}
       <div className="sidebar-foot">
