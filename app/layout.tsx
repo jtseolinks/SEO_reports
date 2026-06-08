@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Heebo } from "next/font/google";
+import { NavProgress } from "@/components/admin/nav-progress";
 import "./globals.css";
 
 const heebo = Heebo({
@@ -24,7 +25,10 @@ export default function RootLayout({
       dir="rtl"
       className={`${heebo.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <NavProgress />
+        {children}
+      </body>
     </html>
   );
 }
