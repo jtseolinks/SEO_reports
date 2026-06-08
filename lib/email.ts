@@ -124,6 +124,71 @@ export async function sendTestEmail(agencyId: string, to: string): Promise<strin
   return info.messageId ?? "";
 }
 
+export async function sendInvitationEmail(
+  agencyId: string,
+  to: string,
+  inviterEmail: string,
+  inviteUrl: string
+): Promise<string> {
+  const s = await getAgencySettings(agencyId);
+  const agencyName = s.agencyName || process.env.AGENCY_NAME || "SEO Agency";
+  const fromName   = s.emailSenderName  || agencyName;
+  const fromEmail  = s.emailSenderEmail || process.env.SMTP_FROM || "noreply@example.com";
+  const transporter = await createTransport(agencyId);
+
+  const html = `<!DOCTYPE html>
+<html dir="rtl" lang="he">
+<head><meta charset="UTF-8"/><title>הזמנה להצטרף</title></head>
+<body style="margin:0;padding:0;background:#f4f6f9;font-family:Arial,sans-serif;direction:rtl;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6f9;padding:40px 0;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+        <tr>
+          <td style="background:#1E2D7D;padding:32px 40px;">
+            <p style="margin:0;font-size:12px;color:rgba(255,255,255,0.6);margin-bottom:6px;">הזמנה לסוכנות</p>
+            <h1 style="margin:0;font-size:26px;font-weight:800;color:#ffffff;">${agencyName}</h1>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:36px 40px;">
+            <p style="margin:0 0 20px;font-size:15px;color:#374151;line-height:1.7;">שלום,</p>
+            <p style="margin:0 0 28px;font-size:15px;color:#374151;line-height:1.7;">
+              <strong>${inviterEmail}</strong> הזמין אותך להצטרף ל-<strong>${agencyName}</strong> במערכת Rankey SEO Reports.
+            </p>
+            <table cellpadding="0" cellspacing="0" style="margin-bottom:28px;">
+              <tr>
+                <td style="background:#1E2D7D;border-radius:8px;padding:14px 32px;text-align:center;">
+                  <a href="${inviteUrl}" style="color:#ffffff;font-size:16px;font-weight:700;text-decoration:none;">קבל הזמנה ←</a>
+                </td>
+              </tr>
+            </table>
+            <p style="margin:0 0 6px;font-size:13px;color:#9CA3AF;">לא עובד הכפתור? העתק את הקישור:</p>
+            <p style="margin:0 0 20px;font-size:12px;"><a href="${inviteUrl}" dir="ltr" style="color:#1E2D7D;word-break:break-all;">${inviteUrl}</a></p>
+            <p style="margin:0;font-size:13px;color:#9CA3AF;">הקישור תקף ל-7 ימים.</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="background:#f9fafb;padding:20px 40px;border-top:1px solid #e5e7eb;">
+            <p style="margin:0;font-size:11px;color:#9CA3AF;text-align:center;">מייל זה נשלח אוטומטית על ידי מערכת Rankey SEO Reports</p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+
+  const info = await transporter.sendMail({
+    from: `${fromName} <${fromEmail}>`,
+    to,
+    subject: `הוזמנת להצטרף ל-${agencyName}`,
+    text: `שלום,\n\n${inviterEmail} הזמין אותך להצטרף ל-${agencyName} במערכת Rankey SEO Reports.\n\nלחץ על הקישור:\n${inviteUrl}\n\nהקישור תקף ל-7 ימים.\n\nבברכה,\n${agencyName}`,
+    html,
+  });
+
+  return info.messageId ?? "";
+}
+
 export function getMonthName(reportMonth: string): string {
   // reportMonth = "2026-05"
   const [year, month] = reportMonth.split("-").map(Number);

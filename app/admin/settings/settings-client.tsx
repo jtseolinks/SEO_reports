@@ -720,6 +720,9 @@ function ScheduleSection({ form, dirty, saving, saveResult, updateField, handleS
 // ── 5. Team section ───────────────────────────────────────────────────────────
 
 type TeamUser = { id: string; email: string; name: string | null; role: string; createdAt: string };
+type InviteRecord = { id: string; email: string; role: string; status: string; expiresAt: string; createdAt: string };
+
+const ROLE_LABELS: Record<string, string> = { OWNER: "בעלים", ADMIN: "מנהל", MEMBER: "חבר צוות" };
 
 function TeamSection() {
   const [users, setUsers]       = useState<TeamUser[]>([]);
@@ -727,25 +730,38 @@ function TeamSection() {
   const [addOpen, setAddOpen]   = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
 
-  const [newName, setNewName]       = useState("");
-  const [newEmail, setNewEmail]     = useState("");
+  const [newName, setNewName]         = useState("");
+  const [newEmail, setNewEmail]       = useState("");
   const [newPassword, setNewPassword] = useState("");
-  const [showPw, setShowPw]         = useState(false);
-  const [adding, setAdding]         = useState(false);
-  const [addErr, setAddErr]         = useState("");
+  const [showPw, setShowPw]           = useState(false);
+  const [adding, setAdding]           = useState(false);
+  const [addErr, setAddErr]           = useState("");
 
-  const [editingId, setEditingId]   = useState<string | null>(null);
-  const [editName, setEditName]     = useState("");
-  const [editEmail, setEditEmail]   = useState("");
-  const [editRole, setEditRole]     = useState("ADMIN");
-  const [editErr, setEditErr]       = useState("");
-  const [saving, setSaving]         = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName]   = useState("");
+  const [editEmail, setEditEmail] = useState("");
+  const [editRole, setEditRole]   = useState("ADMIN");
+  const [editErr, setEditErr]     = useState("");
+  const [saving, setSaving]       = useState(false);
+
+  // ── Invitations state ─────────────────────────────────────────────────────
+  const [invitations, setInvitations]   = useState<InviteRecord[]>([]);
+  const [inviteOpen, setInviteOpen]     = useState(false);
+  const [inviteEmail, setInviteEmail]   = useState("");
+  const [inviteRole, setInviteRole]     = useState("MEMBER");
+  const [inviting, setInviting]         = useState(false);
+  const [revoking, setRevoking]         = useState<string | null>(null);
+  const [inviteResult, setInviteResult] = useState<{ ok: boolean; msg: string; url?: string } | null>(null);
 
   useEffect(() => {
     fetch("/api/settings/users")
       .then(r => r.json())
       .then(d => { setUsers(d.users ?? []); setLoading(false); })
       .catch(() => setLoading(false));
+    fetch("/api/agency/invitations")
+      .then(r => r.json())
+      .then(d => setInvitations(d.invitations ?? []))
+      .catch(() => {});
   }, []);
 
   async function addUser() {
@@ -802,7 +818,43 @@ function TeamSection() {
     }
   }
 
-  const roleLabel = (role: string) => role === "ADMIN" ? "מנהל" : role;
+  async function sendInvite() {
+    if (!inviteEmail) return;
+    setInviting(true); setInviteResult(null);
+    try {
+      const res = await fetch("/api/agency/invitations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: inviteEmail, role: inviteRole }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setInviteResult({ ok: false, msg: data.error ?? "שגיאה בשליחה" }); return; }
+      setInviteResult({
+        ok: true,
+        msg: data.emailSent ? `הזמנה נשלחה אל ${inviteEmail}` : `הזמנה נוצרה — שגיאה בשליחת המייל`,
+        url: data.emailSent ? undefined : data.inviteUrl,
+      });
+      const r2 = await fetch("/api/agency/invitations");
+      const d2 = await r2.json();
+      setInvitations(d2.invitations ?? []);
+      setInviteEmail(""); setInviteRole("MEMBER");
+    } finally {
+      setInviting(false);
+    }
+  }
+
+  async function revokeInvite(id: string) {
+    setRevoking(id);
+    try {
+      await fetch(`/api/agency/invitations/${id}`, { method: "DELETE" });
+      setInvitations(prev => prev.map(i => i.id === id ? { ...i, status: "REVOKED" } : i));
+    } finally {
+      setRevoking(null);
+    }
+  }
+
+  const roleLabel = (role: string) => ROLE_LABELS[role] ?? role;
+  const pendingInvites = invitations.filter(i => i.status === "PENDING");
 
   return (
     <div className="card">
@@ -811,11 +863,76 @@ function TeamSection() {
           <h3 className="card-title">צוות הסוכנות</h3>
           <p className="card-sub">משתמשים עם גישה לממשק הניהול</p>
         </div>
-        <button onClick={() => { setAddOpen(o => !o); setAddErr(""); }} className="btn btn-secondary sm"
-          style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-          <Plus size={13} /> הוסף משתמש
-        </button>
+        <div style={{ display: "flex", gap: 6 }}>
+          <button onClick={() => { setInviteOpen(o => !o); setInviteResult(null); setAddOpen(false); }}
+            className="btn btn-primary sm"
+            style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+            <Mail size={13} /> הזמן משתמש
+          </button>
+          <button onClick={() => { setAddOpen(o => !o); setAddErr(""); setInviteOpen(false); }}
+            className="btn btn-secondary sm"
+            style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+            <Plus size={13} /> הוסף ישיר
+          </button>
+        </div>
       </div>
+
+      {/* Invite form */}
+      {inviteOpen && (
+        <div style={{ margin: "0 20px 16px", padding: "16px", background: "var(--surface-sunken)", borderRadius: "var(--r-md)", border: "1px solid var(--border)" }}>
+          <p style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 12 }}>
+            ישלח מייל עם קישור הזמנה חד-פעמי (תוקף 7 ימים)
+          </p>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 12, marginBottom: 12 }}>
+            <div>
+              <label className="field-label">אימייל המוזמן</label>
+              <input className="rk-input" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)}
+                placeholder="member@agency.co.il" dir="ltr" type="email"
+                onKeyDown={e => { if (e.key === "Enter") sendInvite(); }} autoFocus />
+            </div>
+            <div style={{ minWidth: 120 }}>
+              <label className="field-label">תפקיד</label>
+              <select className="rk-input" value={inviteRole} onChange={e => setInviteRole(e.target.value)}
+                style={{ fontFamily: "inherit" }}>
+                <option value="ADMIN">מנהל</option>
+                <option value="MEMBER">חבר צוות</option>
+              </select>
+            </div>
+          </div>
+          {inviteResult && (
+            <div style={{
+              fontSize: 12, display: "flex", alignItems: "flex-start", gap: 6, marginBottom: 10,
+              color: inviteResult.ok ? "var(--green)" : "var(--red)",
+            }}>
+              {inviteResult.ok
+                ? <CheckCircle2 size={13} style={{ marginTop: 1, flexShrink: 0 }} />
+                : <AlertCircle  size={13} style={{ marginTop: 1, flexShrink: 0 }} />}
+              <div>
+                {inviteResult.msg}
+                {inviteResult.url && (
+                  <div style={{ marginTop: 5 }}>
+                    <span style={{ color: "var(--text-muted)" }}>קישור הזמנה: </span>
+                    <a href={inviteResult.url} dir="ltr" target="_blank" rel="noreferrer"
+                      style={{ wordBreak: "break-all", color: "var(--accent)" }}>
+                      {inviteResult.url}
+                    </a>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={sendInvite} disabled={inviting || !inviteEmail} className="btn btn-primary sm"
+              style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+              {inviting ? <Loader2 size={12} className="animate-spin" /> : <Mail size={12} />}
+              שלח הזמנה
+            </button>
+            <button onClick={() => { setInviteOpen(false); setInviteResult(null); }} className="btn btn-ghost sm">
+              ביטול
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Add user form */}
       {addOpen && (
@@ -953,6 +1070,50 @@ function TeamSection() {
               })}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Pending invitations */}
+      {pendingInvites.length > 0 && (
+        <div style={{ borderTop: "1px solid var(--border)", padding: "14px 20px 20px" }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-muted)", marginBottom: 10 }}>
+            הזמנות בהמתנה ({pendingInvites.length})
+          </div>
+          <div className="table-wrap">
+            <table className="tbl">
+              <thead>
+                <tr>
+                  <th>אימייל</th>
+                  <th>תפקיד</th>
+                  <th>תפוגה</th>
+                  <th style={{ textAlign: "end" }}>ביטול</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pendingInvites.map(inv => (
+                  <tr key={inv.id}>
+                    <td dir="ltr" style={{ color: "var(--text-muted)", fontSize: 13 }}>{inv.email}</td>
+                    <td>
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, background: "var(--surface-sunken)", color: "var(--text-muted)", borderRadius: "var(--r-pill)", padding: "2px 8px" }}>
+                        {roleLabel(inv.role)}
+                      </span>
+                    </td>
+                    <td style={{ color: "var(--text-muted)", fontSize: 12.5 }}>
+                      {new Date(inv.expiresAt).toLocaleDateString("he-IL")}
+                    </td>
+                    <td>
+                      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                        <button onClick={() => revokeInvite(inv.id)} disabled={revoking === inv.id}
+                          className="iconbtn" title="בטל הזמנה" style={{ color: "var(--red)" }}>
+                          {revoking === inv.id ? <Loader2 size={13} className="animate-spin" /> : <X size={13} />}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>
