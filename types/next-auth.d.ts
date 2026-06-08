@@ -35,5 +35,7 @@ declare module "next-auth/jwt" {
     role: string;
     agencyId: string | null;
     membershipRole: MembershipRole | null;
+    // Cached at login — avoids DB hit on every /api/auth/session call.
+    memberships?: SessionMembership[];
   }
 }

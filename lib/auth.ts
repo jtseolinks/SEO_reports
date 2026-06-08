@@ -109,6 +109,20 @@ export const authOptions: NextAuthOptions = {
         token.agencyId = (user as { agencyId?: string | null }).agencyId ?? null;
         token.membershipRole =
           (user as { membershipRole?: MembershipRole | null }).membershipRole ?? null;
+
+        // Cache memberships in the JWT at login so the session callback never
+        // needs a DB round-trip. Stale until re-login, which is acceptable for
+        // an invite-only workspace — membership changes are infrequent.
+        const ms = await prisma.membership.findMany({
+          where: { userId: user.id },
+          include: { agency: { select: { name: true } } },
+          orderBy: { createdAt: "asc" },
+        });
+        token.memberships = ms.map((m) => ({
+          agencyId: m.agencyId,
+          agencyName: m.agency.name,
+          role: m.role,
+        }));
       }
 
       // Workspace switch: client calls update({ agencyId }) → re-issue the token
@@ -128,24 +142,13 @@ export const authOptions: NextAuthOptions = {
       return token;
     },
     async session({ session, token }) {
+      // Pure token read — no DB call. Memberships were cached in the JWT at login.
       if (session.user) {
         session.user.id = token.id as string;
         session.user.role = token.role as string;
         session.user.agencyId = (token.agencyId as string | null) ?? null;
         session.user.membershipRole = (token.membershipRole as MembershipRole | null) ?? null;
-        session.user.memberships = token.id
-          ? (
-              await prisma.membership.findMany({
-                where: { userId: token.id as string },
-                include: { agency: { select: { name: true } } },
-                orderBy: { createdAt: "asc" },
-              })
-            ).map((m) => ({
-              agencyId: m.agencyId,
-              agencyName: m.agency.name,
-              role: m.role,
-            }))
-          : [];
+        session.user.memberships = token.memberships ?? [];
       }
       return session;
     },
