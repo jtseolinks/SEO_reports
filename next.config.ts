@@ -29,7 +29,7 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
-  devIndicators: false,
+  devIndicators: { position: "bottom-right" },
   turbopack: {
     root: __dirname,
   },
