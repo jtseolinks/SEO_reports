@@ -1,18 +1,18 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { randomBytes } from "crypto";
-import { authOptions } from "@/lib/auth";
-import { getAuthorizationUrl, OAUTH_STATE_COOKIE } from "@/lib/google-oauth";
+import { requireAgencyAdmin, toResponse } from "@/lib/authz";
+import { getAuthorizationUrl, OAUTH_STATE_COOKIE, signOAuthState } from "@/lib/google-oauth";
 
 export async function GET() {
-  const session = await getServerSession(authOptions);
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  let ctx;
+  try {
+    ctx = await requireAgencyAdmin();
+  } catch (e) {
+    return toResponse(e);
   }
 
-  // CSRF protection: a random state is sent to Google and echoed back to the
-  // callback, where it must match this cookie.
-  const state = randomBytes(32).toString("hex");
+  // CSRF + agency binding: the state carries the agency id and an HMAC, and is
+  // also echoed in this cookie. The callback validates both.
+  const state = signOAuthState(ctx.agencyId);
   const url = getAuthorizationUrl(state);
 
   const res = NextResponse.redirect(url);

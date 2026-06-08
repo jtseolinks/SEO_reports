@@ -1,17 +1,21 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { requireAgency, toResponse } from "@/lib/authz";
 import { sendReportEmail, getMonthName } from "@/lib/email";
 import { deleteReportFile } from "@/lib/report-storage";
 
 export async function POST() {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  let ctx;
+  try {
+    ctx = await requireAgency();
+  } catch (e) {
+    return toResponse(e);
+  }
 
-  // Find all GENERATED reports that have a contactEmail and a PDF
+  // Find all GENERATED reports (in this agency) that have a contactEmail and a PDF
   const reports = await prisma.monthlyReport.findMany({
     where: {
+      agencyId: ctx.agencyId,
       status: "GENERATED",
       pdfUrl: { not: null },
       client: { excludeFromReports: false },
@@ -29,6 +33,7 @@ export async function POST() {
     const monthName = getMonthName(report.reportMonth);
     try {
       const messageId = await sendReportEmail({
+        agencyId: ctx.agencyId,
         to: client.contactEmail,
         cc: client.ccEmails,
         clientName: client.name,
@@ -46,6 +51,7 @@ export async function POST() {
 
       await prisma.reportEmailLog.create({
         data: {
+          agencyId: ctx.agencyId,
           reportId: report.id,
           clientId: client.id,
           emailTo: client.contactEmail,
@@ -63,6 +69,7 @@ export async function POST() {
 
       await prisma.reportEmailLog.create({
         data: {
+          agencyId: ctx.agencyId,
           reportId: report.id,
           clientId: client.id,
           emailTo: client.contactEmail,
@@ -86,11 +93,16 @@ export async function POST() {
 
 /** GET — preview how many reports are ready to send */
 export async function GET() {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  let ctx;
+  try {
+    ctx = await requireAgency();
+  } catch (e) {
+    return toResponse(e);
+  }
 
   const count = await prisma.monthlyReport.count({
     where: {
+      agencyId: ctx.agencyId,
       status: "GENERATED",
       pdfUrl: { not: null },
       client: { contactEmail: { not: "" }, excludeFromReports: false },

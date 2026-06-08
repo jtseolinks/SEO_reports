@@ -1,14 +1,13 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { requireAgencyAdmin, toResponse } from "@/lib/authz";
+import { disconnectGoogle } from "@/lib/google-oauth";
 
 export async function POST() {
-  const session = await getServerSession(authOptions);
-  if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  try {
+    const ctx = await requireAgencyAdmin();
+    await disconnectGoogle(ctx.agencyId);
+    return NextResponse.json({ success: true });
+  } catch (e) {
+    return toResponse(e);
   }
-
-  await prisma.googleConnection.deleteMany();
-  return NextResponse.json({ success: true });
 }

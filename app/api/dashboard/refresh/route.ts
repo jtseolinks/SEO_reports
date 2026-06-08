@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { requireAgency, requireClientInAgency, toResponse } from "@/lib/authz";
 import { getAuthenticatedClient } from "@/lib/google-oauth";
 import { fetchGscSummary, aggregateGsc } from "@/lib/gsc-api";
 import { fetchGa4OrganicSummary } from "@/lib/ga4-api";
@@ -20,18 +18,23 @@ function periodDates(monthsAgo: number) {
 }
 
 export async function POST(request: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  let ctx;
+  try {
+    ctx = await requireAgency();
+  } catch (e) {
+    return toResponse(e);
+  }
 
   const { clientId } = await request.json();
   if (!clientId) return NextResponse.json({ error: "clientId required" }, { status: 400 });
 
-  const client = await prisma.client.findUnique({
-    where: { id: clientId },
-    include: { googleProperties: true },
-  });
+  let client;
+  try {
+    client = await requireClientInAgency(clientId, ctx.agencyId, { googleProperties: true });
+  } catch (e) {
+    return toResponse(e);
+  }
 
-  if (!client) return NextResponse.json({ error: "Not found" }, { status: 404 });
   if (!client.googleProperties?.gscSiteUrl) {
     return NextResponse.json({ connectionOk: false, error: "No GSC property" });
   }
@@ -41,7 +44,7 @@ export async function POST(request: NextRequest) {
   const prev = periodDates(2); // month before that
 
   try {
-    const auth = await getAuthenticatedClient();
+    const auth = await getAuthenticatedClient(ctx.agencyId);
     if (!auth) return NextResponse.json({ connectionOk: false, error: "Google not connected" });
 
     const [currRows, prevRows, ga4] = await Promise.all([

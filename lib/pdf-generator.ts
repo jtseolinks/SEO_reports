@@ -1,18 +1,16 @@
 import path from "path";
 import fs from "fs/promises";
-import { REPORTS_DIR, reportPublicUrl } from "./report-storage";
-
-async function ensureReportsDir() {
-  await fs.mkdir(REPORTS_DIR, { recursive: true });
-}
+import { agencyReportsDir, reportPublicUrl } from "./report-storage";
 
 export async function generatePdf(
   html: string,
+  agencyId: string,
   filename: string
 ): Promise<string> {
-  await ensureReportsDir();
+  const dir = agencyReportsDir(agencyId);
+  await fs.mkdir(dir, { recursive: true });
 
-  const filePath = path.join(REPORTS_DIR, filename);
+  const filePath = path.join(dir, path.basename(filename));
 
   const puppeteer = await import("puppeteer");
   const browser = await puppeteer.default.launch({
@@ -33,8 +31,8 @@ export async function generatePdf(
     await browser.close();
   }
 
-  // Return the URL path served by the authenticated /reports/[filename] route
-  return reportPublicUrl(filename);
+  // Return the URL path served by the authenticated /reports/[agencyId]/[filename] route
+  return reportPublicUrl(agencyId, filename);
 }
 
 export function buildReportFilename(clientId: string, reportMonth: string): string {

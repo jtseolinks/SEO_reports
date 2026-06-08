@@ -86,12 +86,15 @@ export type ReportData = {
 };
 
 export async function buildReportData(
+  agencyId: string,
   clientId: string,
   reportMonth: string,
   customDates?: { startDate: string; endDate: string }
 ): Promise<ReportData> {
-  const client = await prisma.client.findUnique({
-    where: { id: clientId },
+  // Scope by agencyId so a report can only ever be built for a client the
+  // agency owns.
+  const client = await prisma.client.findFirst({
+    where: { id: clientId, agencyId },
     include: { googleProperties: true, keywords: { where: { isActive: true } } },
   });
 
@@ -104,7 +107,7 @@ export async function buildReportData(
     ? { ...customDates, label: `${customDates.startDate} – ${customDates.endDate}` }
     : defaultCurrent;
 
-  const auth = await getAuthenticatedClient();
+  const auth = await getAuthenticatedClient(agencyId);
   if (!auth) throw new Error("Google account not connected");
 
   const hasGa4 = !!ga4PropertyId;

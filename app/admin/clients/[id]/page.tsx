@@ -3,14 +3,16 @@ export const dynamic = "force-dynamic";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { ClientDetailPage } from "./client-detail-page";
+import { requireAgencyPage } from "@/lib/authz";
 
 type Props = { params: Promise<{ id: string }> };
 
 export default async function ClientDetailRoute({ params }: Props) {
   const { id } = await params;
+  const ctx = await requireAgencyPage();
 
-  const client = await prisma.client.findUnique({
-    where: { id },
+  const client = await prisma.client.findFirst({
+    where: { id, agencyId: ctx.agencyId },
     include: {
       googleProperties: true,
       keywords: { where: { isActive: true }, orderBy: { keyword: "asc" } },

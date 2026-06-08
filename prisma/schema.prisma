@@ -11,6 +11,19 @@ enum UserRole {
   ADMIN
 }
 
+enum MembershipRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  REVOKED
+  EXPIRED
+}
+
 enum ClientStatus {
   ACTIVE
   INACTIVE
@@ -41,18 +54,77 @@ enum SyncJobStatus {
   FAILED
 }
 
+// ─── Tenancy ──────────────────────────────────────────────────────────────────
+
+model Agency {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  memberships      Membership[]
+  invitations      Invitation[]
+  clients          Client[]
+  googleConnection GoogleConnection?
+  settings         AgencySetting[]
+  monthlyReports   MonthlyReport[]
+  gscDailyData     GscDailyData[]
+  ga4DailyData     Ga4DailyData[]
+  reportEmailLogs  ReportEmailLog[]
+  syncJobs         SyncJob[]
+}
+
+model Membership {
+  id        String         @id @default(cuid())
+  userId    String
+  agencyId  String
+  role      MembershipRole @default(MEMBER)
+  createdAt DateTime       @default(now())
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  agency Agency @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, agencyId])
+  @@index([agencyId])
+  @@index([userId])
+}
+
+model Invitation {
+  id          String           @id @default(cuid())
+  agencyId    String
+  email       String
+  role        MembershipRole   @default(MEMBER)
+  tokenHash   String           @unique
+  status      InvitationStatus @default(PENDING)
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  invitedById String?
+  createdAt   DateTime         @default(now())
+
+  agency Agency @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+
+  @@unique([agencyId, email])
+  @@index([agencyId])
+  @@index([email])
+}
+
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  name         String?
-  passwordHash String?
-  role         UserRole @default(ADMIN)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                 String       @id @default(cuid())
+  email              String       @unique
+  name               String?
+  passwordHash       String?
+  role               UserRole     @default(ADMIN)
+  lastActiveAgencyId String?
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  memberships Membership[]
 }
 
 model GoogleConnection {
   id                    String                 @id @default(cuid())
+  agencyId              String                 @unique
   googleEmail           String?
   encryptedAccessToken  String?
   encryptedRefreshToken String?
@@ -62,10 +134,13 @@ model GoogleConnection {
   lastError             String?
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
+
+  agency Agency @relation(fields: [agencyId], references: [id], onDelete: Cascade)
 }
 
 model Client {
   id             String       @id @default(cuid())
+  agencyId       String
   name           String
   domain         String
   contactEmail   String
@@ -84,6 +159,7 @@ model Client {
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
+  agency           Agency                @relation(fields: [agencyId], references: [id], onDelete: Cascade)
   googleProperties ClientGoogleProperty?
   keywords         ClientKeyword[]
   gscDailyData     GscDailyData[]
@@ -91,7 +167,8 @@ model Client {
   monthlyReports   MonthlyReport[]
   syncJobs         SyncJob[]
 
-  @@index([status])
+  @@index([agencyId])
+  @@index([agencyId, status])
   @@index([domain])
 }
 
@@ -131,6 +208,7 @@ model ClientKeyword {
 
 model GscDailyData {
   id          String   @id @default(cuid())
+  agencyId    String
   clientId    String
   siteUrl     String
   date        DateTime
@@ -144,16 +222,19 @@ model GscDailyData {
   position    Float    @default(0)
   createdAt   DateTime @default(now())
 
+  agency Agency @relation(fields: [agencyId], references: [id], onDelete: Cascade)
   client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
   @@index([clientId, date])
   @@index([clientId, query])
   @@index([clientId, page])
+  @@index([agencyId, date])
   @@index([siteUrl])
 }
 
 model Ga4DailyData {
   id              String   @id @default(cuid())
+  agencyId        String
   clientId        String
   propertyId      String
   date            DateTime
@@ -168,16 +249,19 @@ model Ga4DailyData {
   totalRevenue    Float    @default(0)
   createdAt       DateTime @default(now())
 
+  agency Agency @relation(fields: [agencyId], references: [id], onDelete: Cascade)
   client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
   @@index([clientId, date])
   @@index([clientId, landingPage])
+  @@index([agencyId, date])
   @@index([propertyId])
   @@index([channelGroup])
 }
 
 model MonthlyReport {
   id              String       @id @default(cuid())
+  agencyId        String
   clientId        String
   reportMonth     String
   periodStart     DateTime
@@ -199,16 +283,19 @@ model MonthlyReport {
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
 
+  agency    Agency           @relation(fields: [agencyId], references: [id], onDelete: Cascade)
   client    Client           @relation(fields: [clientId], references: [id], onDelete: Cascade)
   emailLogs ReportEmailLog[]
 
   @@unique([clientId, reportMonth])
   @@index([clientId, reportMonth])
+  @@index([agencyId, status])
   @@index([status])
 }
 
 model ReportEmailLog {
   id                String    @id @default(cuid())
+  agencyId          String
   reportId          String
   clientId          String
   emailTo           String
@@ -220,21 +307,29 @@ model ReportEmailLog {
   sentAt            DateTime?
   createdAt         DateTime  @default(now())
 
+  agency Agency        @relation(fields: [agencyId], references: [id], onDelete: Cascade)
   report MonthlyReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
 
   @@index([reportId])
   @@index([clientId])
+  @@index([agencyId, status])
   @@index([status])
 }
 
 model AgencySetting {
-  key       String   @id
+  agencyId  String
+  key       String
   value     String
   updatedAt DateTime @updatedAt
+
+  agency Agency @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+
+  @@id([agencyId, key])
 }
 
 model SyncJob {
   id           String        @id @default(cuid())
+  agencyId     String
   clientId     String?
   jobType      String
   dateFrom     DateTime?
@@ -245,8 +340,10 @@ model SyncJob {
   errorMessage String?
   createdAt    DateTime      @default(now())
 
+  agency Agency  @relation(fields: [agencyId], references: [id], onDelete: Cascade)
   client Client? @relation(fields: [clientId], references: [id], onDelete: SetNull)
 
+  @@index([agencyId, status])
   @@index([clientId])
   @@index([status])
   @@index([jobType])

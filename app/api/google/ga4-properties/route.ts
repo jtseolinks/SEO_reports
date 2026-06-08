@@ -1,14 +1,17 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { requireAgency, toResponse } from "@/lib/authz";
 import { getAuthenticatedClient } from "@/lib/google-oauth";
 import { listGa4Properties } from "@/lib/ga4-api";
 
 export async function GET() {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  let ctx;
+  try {
+    ctx = await requireAgency();
+  } catch (e) {
+    return toResponse(e);
+  }
 
-  const auth = await getAuthenticatedClient();
+  const auth = await getAuthenticatedClient(ctx.agencyId);
   if (!auth) {
     return NextResponse.json({ error: "Google account not connected or requires re-auth" }, { status: 400 });
   }

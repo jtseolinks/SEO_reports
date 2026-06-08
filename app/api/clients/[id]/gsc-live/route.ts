@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { HttpError, requireAgency, requireClientInAgency, toResponse } from "@/lib/authz";
 import { getAuthenticatedClient } from "@/lib/google-oauth";
 import { fetchGscDailyTrend } from "@/lib/gsc-api";
 import { fetchGa4OrganicSummary } from "@/lib/ga4-api";
@@ -9,42 +7,41 @@ import { fetchGa4OrganicSummary } from "@/lib/ga4-api";
 type Params = { params: Promise<{ id: string }> };
 
 export async function GET(request: NextRequest, { params }: Params) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  const { id } = await params;
-  const { searchParams } = request.nextUrl;
-  const startDate = searchParams.get("startDate");
-  const endDate = searchParams.get("endDate");
-
-  if (!startDate || !endDate) {
-    return NextResponse.json({ error: "startDate and endDate required" }, { status: 400 });
+  let ctx;
+  try {
+    ctx = await requireAgency();
+  } catch (e) {
+    return toResponse(e);
   }
-
-  const client = await prisma.client.findUnique({
-    where: { id },
-    include: { googleProperties: true },
-  });
-
-  if (!client) return NextResponse.json({ error: "Client not found" }, { status: 404 });
-  if (!client.googleProperties?.gscSiteUrl) {
-    return NextResponse.json({ error: "No GSC property mapped" }, { status: 400 });
-  }
-
-  const auth = await getAuthenticatedClient();
-  if (!auth) return NextResponse.json({ error: "Google not connected" }, { status: 400 });
-
-  const { gscSiteUrl, ga4PropertyId } = client.googleProperties;
-  const hasGa4 = !!ga4PropertyId;
-
-  // Calculate previous period with the same duration
-  const startMs = new Date(startDate).getTime();
-  const endMs   = new Date(endDate).getTime();
-  const durationMs = endMs - startMs;
-  const prevEndDate   = new Date(startMs - 86400000).toISOString().split("T")[0];
-  const prevStartDate = new Date(startMs - durationMs - 86400000).toISOString().split("T")[0];
 
   try {
+    const { id } = await params;
+    const { searchParams } = request.nextUrl;
+    const startDate = searchParams.get("startDate");
+    const endDate = searchParams.get("endDate");
+
+    if (!startDate || !endDate) {
+      return NextResponse.json({ error: "startDate and endDate required" }, { status: 400 });
+    }
+
+    const client = await requireClientInAgency(id, ctx.agencyId, { googleProperties: true });
+    if (!client.googleProperties?.gscSiteUrl) {
+      return NextResponse.json({ error: "No GSC property mapped" }, { status: 400 });
+    }
+
+    const auth = await getAuthenticatedClient(ctx.agencyId);
+    if (!auth) return NextResponse.json({ error: "Google not connected" }, { status: 400 });
+
+    const { gscSiteUrl, ga4PropertyId } = client.googleProperties;
+    const hasGa4 = !!ga4PropertyId;
+
+    // Calculate previous period with the same duration
+    const startMs = new Date(startDate).getTime();
+    const endMs   = new Date(endDate).getTime();
+    const durationMs = endMs - startMs;
+    const prevEndDate   = new Date(startMs - 86400000).toISOString().split("T")[0];
+    const prevStartDate = new Date(startMs - durationMs - 86400000).toISOString().split("T")[0];
+
     const [trendData, ga4Summary, ga4Prev] = await Promise.all([
       fetchGscDailyTrend(auth, gscSiteUrl, startDate, endDate),
       hasGa4
@@ -76,9 +73,10 @@ export async function GET(request: NextRequest, { params }: Params) {
           }
         : null,
     });
-  } catch (err) {
+  } catch (e) {
+    if (e instanceof HttpError) return toResponse(e);
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : String(err) },
+      { error: e instanceof Error ? e.message : String(e) },
       { status: 500 }
     );
   }

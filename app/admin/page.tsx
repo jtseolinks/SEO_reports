@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { BulkGenerateButton } from "@/app/admin/_components/BulkGenerateModal";
 import { DashboardClientsTable } from "@/app/admin/_components/DashboardClientsTable";
+import { requireAgencyPage } from "@/lib/authz";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -79,7 +80,7 @@ function DataStatusBadge({ hasProps }: { hasProps: boolean }) {
 
 // ── data fetching ─────────────────────────────────────────────────────────────
 
-async function getDashboardData() {
+async function getDashboardData(agencyId: string) {
   const now = new Date();
   const calendarMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -89,6 +90,7 @@ async function getDashboardData() {
   // (e.g. it's June but the latest report cycle is May). Falls back to the
   // current calendar month when no reports exist yet.
   const latest = await prisma.monthlyReport.findFirst({
+    where: { agencyId },
     orderBy: { reportMonth: "desc" },
     select: { reportMonth: true },
   });
@@ -103,13 +105,14 @@ async function getDashboardData() {
     clients,
     recentReports,
   ] = await Promise.all([
-    prisma.client.count(),
-    prisma.client.count({ where: { createdAt: { gte: startOfMonth } } }),
+    prisma.client.count({ where: { agencyId } }),
+    prisma.client.count({ where: { agencyId, createdAt: { gte: startOfMonth } } }),
     prisma.monthlyReport.findMany({
-      where: { reportMonth: currentMonth },
+      where: { agencyId, reportMonth: currentMonth },
       select: { status: true },
     }),
     prisma.client.findMany({
+      where: { agencyId },
       include: {
         googleProperties: true,
         monthlyReports: {
@@ -125,7 +128,7 @@ async function getDashboardData() {
       orderBy: { name: "asc" },
     }),
     prisma.monthlyReport.findMany({
-      where: { updatedAt: { gte: thirtyDaysAgo } },
+      where: { agencyId, updatedAt: { gte: thirtyDaysAgo } },
       include: { client: { select: { name: true, domain: true } } },
       orderBy: { updatedAt: "desc" },
       take: 8,
@@ -173,7 +176,8 @@ async function getDashboardData() {
 // ── page ──────────────────────────────────────────────────────────────────────
 
 export default async function AdminPage() {
-  const d = await getDashboardData();
+  const ctx = await requireAgencyPage();
+  const d = await getDashboardData(ctx.agencyId);
 
   // Build client rows for the client component
   const clientRows = d.clients.map(client => {
