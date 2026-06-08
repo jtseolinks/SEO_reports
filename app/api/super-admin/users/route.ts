@@ -15,7 +15,7 @@ export async function GET() {
         isSuperAdmin: true,
         createdAt: true,
         memberships: {
-          select: { role: true, agency: { select: { name: true } } },
+          select: { agencyId: true, role: true, agency: { select: { name: true } } },
         },
       },
     });

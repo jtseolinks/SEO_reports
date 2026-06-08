@@ -73,6 +73,24 @@ model Agency {
   ga4DailyData     Ga4DailyData[]
   reportEmailLogs  ReportEmailLog[]
   syncJobs         SyncJob[]
+  setupTokens      SetupToken[]
+}
+
+model SetupToken {
+  id             String    @id @default(cuid())
+  tokenHash      String    @unique
+  userId         String
+  agencyId       String
+  expiresAt      DateTime
+  usedAt         DateTime?
+  isAgencySetup  Boolean   @default(false)
+  createdAt      DateTime  @default(now())
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  agency Agency @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([agencyId])
 }
 
 model Membership {
@@ -120,7 +138,8 @@ model User {
   createdAt          DateTime     @default(now())
   updatedAt          DateTime     @updatedAt
 
-  memberships Membership[]
+  memberships  Membership[]
+  setupTokens  SetupToken[]
 }
 
 model GoogleConnection {

@@ -22,13 +22,11 @@ type Stats = {
   monitored: number;
   ga4Count: number;
   gscCount: number;
-  emailsSentThisMonth: number;
 };
 
 type Props = {
   connection: ConnectionData | null;
   stats: Stats;
-  sendgridConnected: boolean;
   successMessage?: string;
   errorMessage?: string;
 };
@@ -82,7 +80,7 @@ function PermissionPill({ label }: { label: string }) {
 // ── main component ────────────────────────────────────────────────────────────
 
 export function GoogleConnectionClient({
-  connection, stats, sendgridConnected, successMessage, errorMessage,
+  connection, stats, successMessage, errorMessage,
 }: Props) {
   const router = useRouter();
   const [, startTransition] = useTransition();
@@ -299,76 +297,6 @@ export function GoogleConnectionClient({
         )}
       </div>
 
-      {/* ── שירותים נוספים ─────────────────────────────────────────────────── */}
-      <div>
-        <h2 style={{ fontSize: 13, fontWeight: 600, color: "var(--text-muted)", marginBottom: 14, letterSpacing: "0.04em", textTransform: "uppercase" }}>
-          שירותים נוספים
-        </h2>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 16 }}>
-
-          {/* Google Drive */}
-          <div className="card" style={{ padding: 20 }}>
-            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 14 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <div style={{
-                  width: 42, height: 42, borderRadius: 10, flexShrink: 0,
-                  background: "#f1f3f4", display: "grid", placeItems: "center",
-                  fontSize: 13, fontWeight: 700, color: "#5f6368",
-                }}>
-                  GD
-                </div>
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: 14, color: "var(--text)", marginBottom: 4 }}>Google Drive</div>
-                  <span className="rk-badge warn" style={{ fontSize: 11 }}>
-                    <span className="pip" />לא מחובר
-                  </span>
-                </div>
-              </div>
-            </div>
-            <p style={{ fontSize: 12.5, color: "var(--text-muted)", marginBottom: 16, lineHeight: 1.5 }}>
-              אחסון אוטומטי של דוחות PDF בתיקיית לקוח ייעודית
-            </p>
-            <button className="btn btn-primary" style={{ fontSize: 13 }}>
-              חבר
-            </button>
-          </div>
-
-          {/* SendGrid */}
-          <div className="card" style={{ padding: 20 }}>
-            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 14 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <div style={{
-                  width: 42, height: 42, borderRadius: 10, flexShrink: 0,
-                  background: "#EBF8FA", display: "grid", placeItems: "center",
-                  fontSize: 13, fontWeight: 700, color: "#1A82A2",
-                }}>
-                  SG
-                </div>
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: 14, color: "var(--text)", marginBottom: 4 }}>SendGrid</div>
-                  <span className={`rk-badge ${sendgridConnected ? "success" : "warn"}`} style={{ fontSize: 11 }}>
-                    <span className="pip" />{sendgridConnected ? "מחובר" : "לא מחובר"}
-                  </span>
-                </div>
-              </div>
-            </div>
-            <p style={{ fontSize: 12.5, color: "var(--text-muted)", marginBottom: 16, lineHeight: 1.5 }}>
-              שליחת דוחות במייל ובניית תבניות אישיות ללקוח
-            </p>
-            {sendgridConnected ? (
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <span style={{ fontSize: 12.5, color: "var(--text-muted)" }}>
-                  מחובר · {stats.emailsSentThisMonth} שליחות החודש
-                </span>
-                <button className="btn btn-secondary" style={{ fontSize: 13 }}>נהל</button>
-              </div>
-            ) : (
-              <button className="btn btn-primary" style={{ fontSize: 13 }}>חבר</button>
-            )}
-          </div>
-
-        </div>
-      </div>
     </div>
   );
 }

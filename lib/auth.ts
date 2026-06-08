@@ -128,16 +128,23 @@ export const authOptions: NextAuthOptions = {
       }
 
       // Workspace switch: client calls update({ agencyId }) → re-issue the token
-      // for the new agency, but only if the user actually belongs to it.
+      // for the new agency.  Super-admin can enter any agency without membership;
+      // regular users must be a member of the target agency.
       if (trigger === "update" && session?.agencyId && token.id) {
-        const m = await prisma.membership.findUnique({
-          where: {
-            userId_agencyId: { userId: token.id as string, agencyId: session.agencyId },
-          },
-        });
-        if (m) {
-          token.agencyId = m.agencyId;
-          token.membershipRole = m.role;
+        if (token.isSuperAdmin) {
+          // Super-admin impersonation — grant OWNER-level access to any agency.
+          token.agencyId = session.agencyId;
+          token.membershipRole = "OWNER";
+        } else {
+          const m = await prisma.membership.findUnique({
+            where: {
+              userId_agencyId: { userId: token.id as string, agencyId: session.agencyId },
+            },
+          });
+          if (m) {
+            token.agencyId = m.agencyId;
+            token.membershipRole = m.role;
+          }
         }
       }
 

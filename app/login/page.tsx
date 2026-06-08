@@ -151,12 +151,6 @@ export default function LoginPage() {
               כניסה למערכת
             </button>
 
-            <p style={{ textAlign: "center", fontSize: 13, color: "var(--text-muted)", marginTop: 4 }}>
-              עסק חדש?{" "}
-              <a href="/register" style={{ color: "var(--accent)", textDecoration: "none", fontWeight: 500 }}>
-                צור סוכנות חדשה
-              </a>
-            </p>
           </form>
         </div>
       </div>

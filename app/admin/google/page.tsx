@@ -16,14 +16,10 @@ export default async function GooglePage({
     getGoogleConnection(ctx.agencyId),
   ]);
 
-  const now = new Date();
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-
-  const [monitoredCount, ga4Count, gscCount, emailsSentThisMonth] = await Promise.all([
+  const [monitoredCount, ga4Count, gscCount] = await Promise.all([
     prisma.client.count({ where: { agencyId: ctx.agencyId, googleProperties: { isNot: null } } }),
     prisma.clientGoogleProperty.count({ where: { client: { agencyId: ctx.agencyId }, ga4PropertyId: { not: "" } } }),
     prisma.clientGoogleProperty.count({ where: { client: { agencyId: ctx.agencyId } } }),
-    prisma.reportEmailLog.count({ where: { agencyId: ctx.agencyId, createdAt: { gte: startOfMonth } } }),
   ]);
 
   return (
@@ -50,8 +46,7 @@ export default async function GooglePage({
               }
             : null
         }
-        stats={{ monitored: monitoredCount, ga4Count, gscCount, emailsSentThisMonth }}
-        sendgridConnected={!!(process.env.SENDGRID_API_KEY)}
+        stats={{ monitored: monitoredCount, ga4Count, gscCount }}
         successMessage={params.success === "1" ? "חשבון Google חובר בהצלחה." : undefined}
         errorMessage={params.error ? formatOAuthError(params.error) : undefined}
       />

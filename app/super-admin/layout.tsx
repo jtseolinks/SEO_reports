@@ -4,12 +4,14 @@ import { authOptions } from "@/lib/auth";
 import Link from "next/link";
 import { HashMark } from "@/components/brand/hash-mark";
 import { LayoutDashboard, ArrowRight } from "lucide-react";
+import { SessionProvider } from "@/components/admin/session-provider";
 
 export default async function SuperAdminLayout({ children }: { children: React.ReactNode }) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.isSuperAdmin) redirect("/admin");
 
   return (
+    <SessionProvider>
     <div style={{ minHeight: "100vh", background: "var(--bg)", display: "flex", flexDirection: "column" }}>
       {/* Top nav */}
       <nav style={{
@@ -63,5 +65,6 @@ export default async function SuperAdminLayout({ children }: { children: React.R
         {children}
       </div>
     </div>
+    </SessionProvider>
   );
 }

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import {
-  LayoutDashboard, Users, FileText, Plug, Settings, ChevronDown, ShieldAlert,
+  LayoutDashboard, Users, FileText, Plug, Settings, ChevronDown, ShieldAlert, UserCog,
 } from "lucide-react";
 import { HashMark } from "@/components/brand/hash-mark";
 
@@ -12,6 +12,7 @@ const NAV_MANAGEMENT = [
   { href: "/admin",         label: "לוח בקרה",    icon: LayoutDashboard, exact: true, countKey: null },
   { href: "/admin/clients", label: "לקוחות",       icon: Users,           countKey: "clients" as const },
   { href: "/admin/reports", label: "דוחות",        icon: FileText,        countKey: "reports" as const },
+  { href: "/admin/users",   label: "משתמשים",      icon: UserCog,         countKey: null },
 ];
 const NAV_CONFIG = [
   { href: "/admin/google",   label: "אינטגרציות", icon: Plug },

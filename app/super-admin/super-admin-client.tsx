@@ -1,10 +1,13 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import {
   Building2, Users, FileText, Globe, Plus, Pencil, Trash2,
   X, Check, Loader2, AlertCircle, CheckCircle2, ChevronDown,
   ChevronRight, ShieldCheck, Shield, UserPlus, RefreshCw, Wifi, WifiOff,
+  LogIn,
 } from "lucide-react";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -14,17 +17,23 @@ type Agency = {
   memberCount: number; clientCount: number; reportCount: number;
   googleStatus: string | null; googleEmail: string | null;
   owner: { email: string; name: string | null } | null;
+  ownerSetupPending: boolean;
+  setupPercent: number;
+  setupChecks: { password: boolean; agencyName: boolean; google: boolean; team: boolean; smtp: boolean };
 };
+
+type SetupStatus = "complete" | "pending" | "expired" | "none";
 
 type Member = {
   userId: string; email: string; name: string | null;
   role: string; isSuperAdmin: boolean; createdAt: string;
+  setupStatus: SetupStatus;
 };
 
 type PlatformUser = {
   id: string; email: string; name: string | null;
   isSuperAdmin: boolean; createdAt: string;
-  memberships: { role: string; agency: { name: string } }[];
+  memberships: { agencyId: string; role: string; agency: { name: string } }[];
 };
 
 type Stats = { agencyCount: number; userCount: number; clientCount: number; reportCount: number };
@@ -32,6 +41,61 @@ type Stats = { agencyCount: number; userCount: number; clientCount: number; repo
 const ROLE_LABELS: Record<string, string> = { OWNER: "בעלים", ADMIN: "מנהל", MEMBER: "חבר צוות" };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+function SetupBar({ percent, checks }: {
+  percent: number;
+  checks: { password: boolean; agencyName: boolean; google: boolean; team: boolean; smtp: boolean };
+}) {
+  const color = percent === 100 ? "#16a34a" : percent >= 60 ? "#f59e0b" : "#ef4444";
+  const labels: [keyof typeof checks, string][] = [
+    ["password", "סיסמא"],
+    ["agencyName", "שם סוכנות"],
+    ["google", "Google"],
+    ["team", "צוות"],
+    ["smtp", "SMTP"],
+  ];
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 110 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <div style={{ flex: 1, height: 6, background: "#e5e7eb", borderRadius: 3, overflow: "hidden" }}>
+          <div style={{ height: "100%", width: `${percent}%`, background: color, borderRadius: 3,
+            transition: "width 0.3s" }} />
+        </div>
+        <span style={{ fontSize: 11, fontWeight: 700, color, minWidth: 30, textAlign: "end" }}>
+          {percent}%
+        </span>
+      </div>
+      <div style={{ display: "flex", gap: 3, flexWrap: "wrap" }}>
+        {labels.map(([key, label]) => (
+          <span key={key} style={{
+            fontSize: 9, padding: "1px 4px", borderRadius: 3, fontWeight: 600,
+            background: checks[key] ? "#dcfce7" : "#f3f4f6",
+            color: checks[key] ? "#15803d" : "#9ca3af",
+            border: `1px solid ${checks[key] ? "#bbf7d0" : "#e5e7eb"}`,
+          }}>
+            {checks[key] ? "✓" : "○"} {label}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function MemberSetupBadge({ status }: { status: SetupStatus }) {
+  const MAP: Record<SetupStatus, { label: string; bg: string; color: string; border: string }> = {
+    complete: { label: "מוגדר ✓",   bg: "#dcfce7", color: "#15803d", border: "#bbf7d0" },
+    pending:  { label: "ממתין ⏳",  bg: "#fef9c3", color: "#854d0e", border: "#fde68a" },
+    expired:  { label: "פג תוקף ⚠", bg: "#fee2e2", color: "#991b1b", border: "#fecaca" },
+    none:     { label: "לא נשלח",   bg: "#f3f4f6", color: "#6b7280", border: "#e5e7eb" },
+  };
+  const s = MAP[status];
+  return (
+    <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 4,
+      background: s.bg, color: s.color, border: `1px solid ${s.border}`, whiteSpace: "nowrap" }}>
+      {s.label}
+    </span>
+  );
+}
 
 function Err({ msg }: { msg: string }) {
   if (!msg) return null;
@@ -107,23 +171,72 @@ function CreateAgencyModal({ onClose, onCreated }: { onClose: () => void; onCrea
   const [agencyName, setAgencyName] = useState("");
   const [ownerEmail, setOwnerEmail] = useState("");
   const [ownerName, setOwnerName]   = useState("");
-  const [ownerPw, setOwnerPw]       = useState("");
   const [loading, setLoading]       = useState(false);
   const [err, setErr]               = useState("");
+  // When email send fails — show the setup URL so admin can share manually
+  const [fallbackUrl, setFallbackUrl] = useState("");
+  const [emailErr, setEmailErr]       = useState("");
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    setErr(""); setLoading(true);
+    setErr(""); setFallbackUrl(""); setEmailErr(""); setLoading(true);
     try {
       const res = await fetch("/api/super-admin/agencies", {
         method:"POST", headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({ agencyName, ownerEmail: ownerEmail || undefined,
-          ownerName: ownerName || undefined, ownerPassword: ownerPw || undefined }),
+        body: JSON.stringify({ agencyName, ownerEmail, ownerName: ownerName || undefined }),
       });
       const data = await res.json();
       if (!res.ok) { setErr(data.error ?? "שגיאה"); return; }
-      onCreated();
+      if (data.emailSent === false) {
+        // Email failed — show manual link
+        setFallbackUrl(data.setupUrl ?? "");
+        setEmailErr(data.emailError ?? "שגיאה בשליחת המייל");
+      } else {
+        onCreated();
+      }
     } finally { setLoading(false); }
+  }
+
+  // If email failed — show the fallback URL and let admin close
+  if (fallbackUrl) {
+    return (
+      <Modal title="סוכנות נוצרה ✓" onClose={() => { setFallbackUrl(""); onCreated(); }}>
+        <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+          <div style={{ display:"flex", alignItems:"flex-start", gap:10, padding:"12px 14px",
+            background:"#fff7ed", border:"1px solid #fed7aa", borderRadius:"var(--r-md)" }}>
+            <AlertCircle size={16} style={{ color:"#f97316", flexShrink:0, marginTop:1 }}/>
+            <div style={{ fontSize:13 }}>
+              <strong>לא הצלחנו לשלוח את המייל.</strong><br/>
+              <span style={{ color:"var(--text-muted)" }}>{emailErr}</span>
+            </div>
+          </div>
+          <div>
+            <p style={{ fontSize:13, marginBottom:8, fontWeight:600 }}>
+              שלח ידנית את קישור ההגדרה לבעלים:
+            </p>
+            <div style={{ display:"flex", gap:8, alignItems:"center",
+              background:"var(--surface-sunken)", border:"1px solid var(--border)",
+              borderRadius:"var(--r-md)", padding:"8px 12px" }}>
+              <span style={{ flex:1, fontSize:12, fontFamily:"monospace", direction:"ltr",
+                wordBreak:"break-all", color:"var(--accent)" }}>{fallbackUrl}</span>
+              <button
+                type="button"
+                className="btn btn-ghost sm"
+                onClick={() => { navigator.clipboard.writeText(fallbackUrl); }}
+                style={{ flexShrink:0, fontSize:11 }}>
+                העתק
+              </button>
+            </div>
+            <p style={{ fontSize:11, color:"var(--text-muted)", marginTop:6 }}>
+              הקישור תקף ל-7 ימים. הבעלים יצטרך להגדיר סיסמא דרך הקישור.
+            </p>
+          </div>
+          <button className="btn btn-primary" onClick={() => { setFallbackUrl(""); onCreated(); }}>
+            <CheckCircle2 size={14} style={{ display:"inline", marginLeft:5 }}/> סגור
+          </button>
+        </div>
+      </Modal>
+    );
   }
 
   return (
@@ -136,33 +249,30 @@ function CreateAgencyModal({ onClose, onCreated }: { onClose: () => void; onCrea
         </div>
         <div style={{ borderTop:"1px solid var(--border)", paddingTop:14 }}>
           <p style={{ fontSize:12, color:"var(--text-muted)", marginBottom:12 }}>
-            בעלים ראשוני (אופציונלי — ניתן להוסיף מאוחר יותר)
+            בעלים ראשוני — ישלח מייל עם קישור הגדרה
           </p>
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
             <div className="field">
-              <label className="field-label">אימייל בעלים</label>
+              <label className="field-label">אימייל בעלים *</label>
               <input className="rk-input" type="email" value={ownerEmail}
-                onChange={e=>setOwnerEmail(e.target.value)} dir="ltr" placeholder="owner@agency.com"/>
+                onChange={e=>setOwnerEmail(e.target.value)} dir="ltr"
+                placeholder="owner@agency.com" required/>
             </div>
             <div className="field">
-              <label className="field-label">שם</label>
+              <label className="field-label">שם (אופציונלי)</label>
               <input className="rk-input" value={ownerName}
                 onChange={e=>setOwnerName(e.target.value)} placeholder="ישראל ישראלי"/>
             </div>
           </div>
-          {ownerEmail && (
-            <div className="field" style={{ marginTop:10 }}>
-              <label className="field-label">סיסמה (אם משתמש חדש)</label>
-              <input className="rk-input" type="password" value={ownerPw}
-                onChange={e=>setOwnerPw(e.target.value)} dir="ltr" placeholder="מינימום 8 תווים"/>
-            </div>
-          )}
+          <p style={{ fontSize:11, color:"var(--text-faint)", marginTop:8 }}>
+            הבעלים יקבל מייל עם קישור להגדרת סיסמא וכניסה ראשונה.
+          </p>
         </div>
         <Err msg={err}/>
         <div style={{ display:"flex", gap:8 }}>
           <button type="submit" disabled={loading} className="btn btn-primary"
             style={{ display:"inline-flex", alignItems:"center", gap:6 }}>
-            {loading ? <Loader2 size={13} className="animate-spin"/> : <Plus size={13}/>} צור סוכנות
+            {loading ? <Loader2 size={13} className="animate-spin"/> : <Plus size={13}/>} צור סוכנות חדשה
           </button>
           <button type="button" onClick={onClose} className="btn btn-ghost">ביטול</button>
         </div>
@@ -229,13 +339,14 @@ function MembersModal({ agency, onClose }: { agency: Agency; onClose: () => void
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [addEmail, setAddEmail]   = useState("");
-  const [addName, setAddName]     = useState("");
-  const [addPw, setAddPw]         = useState("");
   const [addRole, setAddRole]     = useState("MEMBER");
   const [adding, setAdding]       = useState(false);
   const [addErr, setAddErr]       = useState("");
+  const [addSetupUrl, setAddSetupUrl] = useState("");
   const [saving, setSaving]       = useState<string | null>(null);
   const [removing, setRemoving]   = useState<string | null>(null);
+  const [resending, setResending] = useState<string | null>(null);
+  const [resendOk, setResendOk]   = useState<Record<string, { ok: boolean; url?: string }>>({});
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -265,17 +376,32 @@ function MembersModal({ agency, onClose }: { agency: Agency; onClose: () => void
     setRemoving(null);
   }
 
+  async function resendSetup(userId: string) {
+    setResending(userId);
+    const res = await fetch(
+      `/api/super-admin/agencies/${agency.id}/members/${userId}/resend-setup`,
+      { method: "POST" }
+    );
+    const data = await res.json();
+    if (!res.ok) { alert(data.error ?? "שגיאה"); setResending(null); return; }
+    setResendOk(prev => ({ ...prev, [userId]: { ok: data.emailSent, url: data.setupUrl } }));
+    // Refresh to update setupStatus from "expired"/"none" → "pending"
+    await load();
+    setResending(null);
+  }
+
   async function addMember(e: React.FormEvent) {
     e.preventDefault();
-    setAddErr(""); setAdding(true);
+    setAddErr(""); setAddSetupUrl(""); setAdding(true);
     try {
       const res = await fetch(`/api/super-admin/agencies/${agency.id}/members`, {
         method:"POST", headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({ email:addEmail, name:addName||undefined, password:addPw||undefined, role:addRole }),
+        body: JSON.stringify({ email: addEmail, role: addRole }),
       });
       const data = await res.json();
       if (!res.ok) { setAddErr(data.error ?? "שגיאה"); return; }
-      setAddEmail(""); setAddName(""); setAddPw(""); setAddRole("MEMBER");
+      setAddEmail(""); setAddRole("MEMBER");
+      if (data.setupUrl) setAddSetupUrl(data.setupUrl);
       await load();
     } finally { setAdding(false); }
   }
@@ -294,51 +420,84 @@ function MembersModal({ agency, onClose }: { agency: Agency; onClose: () => void
           </p>
         ) : (
           <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-            {members.map(m => (
-              <div key={m.userId} style={{ display:"flex", alignItems:"center", gap:10,
-                padding:"8px 12px", background:"var(--surface-sunken)",
-                borderRadius:"var(--r-md)", border:"1px solid var(--border-subtle)" }}>
-                <div style={{ width:30, height:30, borderRadius:"50%", flexShrink:0,
-                  background:"var(--accent-soft)", display:"grid", placeItems:"center",
-                  fontSize:11, fontWeight:700, color:"var(--accent)" }}>
-                  {(m.name || m.email)[0].toUpperCase()}
-                </div>
-                <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ fontSize:13, fontWeight:600, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
-                    {m.name ?? m.email}
-                    {m.isSuperAdmin && (
-                      <span style={{ marginInlineStart:6, fontSize:10, color:"var(--brand-cyan)",
-                        background:"rgba(91,194,240,0.15)", borderRadius:4, padding:"1px 5px" }}>
-                        SA
-                      </span>
-                    )}
+            {members.map(m => {
+              const result = resendOk[m.userId];
+              return (
+                <div key={m.userId} style={{ display:"flex", alignItems:"flex-start", gap:10,
+                  padding:"10px 12px", background:"var(--surface-sunken)",
+                  borderRadius:"var(--r-md)", border:"1px solid var(--border-subtle)" }}>
+                  {/* Avatar */}
+                  <div style={{ width:30, height:30, borderRadius:"50%", flexShrink:0,
+                    background:"var(--accent-soft)", display:"grid", placeItems:"center",
+                    fontSize:11, fontWeight:700, color:"var(--accent)", marginTop:2 }}>
+                    {(m.name || m.email)[0].toUpperCase()}
                   </div>
-                  <div style={{ fontSize:11, color:"var(--text-muted)", direction:"ltr" }}>{m.email}</div>
+                  {/* Info */}
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:13, fontWeight:600, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                      {m.name ?? m.email}
+                      {m.isSuperAdmin && (
+                        <span style={{ marginInlineStart:6, fontSize:10, color:"var(--brand-cyan)",
+                          background:"rgba(91,194,240,0.15)", borderRadius:4, padding:"1px 5px" }}>SA</span>
+                      )}
+                    </div>
+                    <div style={{ fontSize:11, color:"var(--text-muted)", direction:"ltr" }}>{m.email}</div>
+                    {/* Setup status row */}
+                    <div style={{ display:"flex", alignItems:"center", gap:6, marginTop:5 }}>
+                      <MemberSetupBadge status={m.setupStatus} />
+                      {(m.setupStatus === "expired" || m.setupStatus === "none") && (
+                        <button
+                          onClick={() => resendSetup(m.userId)}
+                          disabled={resending === m.userId}
+                          style={{ fontSize:10, background:"none", border:"1px solid var(--border)",
+                            borderRadius:4, cursor:"pointer", padding:"2px 7px", color:"var(--text-muted)",
+                            display:"inline-flex", alignItems:"center", gap:3 }}>
+                          {resending === m.userId
+                            ? <Loader2 size={9} className="animate-spin"/>
+                            : <RefreshCw size={9}/>}
+                          שלח מחדש
+                        </button>
+                      )}
+                      {result && (
+                        result.ok
+                          ? <span style={{ fontSize:10, color:"#16a34a", display:"inline-flex", alignItems:"center", gap:2 }}>
+                              <CheckCircle2 size={10}/> נשלח
+                            </span>
+                          : <button type="button" style={{ fontSize:10, background:"none", border:"none",
+                              cursor:"pointer", color:"#ef4444", padding:0, textDecoration:"underline" }}
+                              onClick={() => result.url && navigator.clipboard.writeText(result.url)}>
+                              ⚠ מייל נכשל — העתק קישור
+                            </button>
+                      )}
+                    </div>
+                  </div>
+                  {/* Role selector */}
+                  <select value={m.role}
+                    onChange={e => changeRole(m.userId, e.target.value)}
+                    disabled={saving === m.userId}
+                    style={{ fontSize:12, padding:"3px 6px", borderRadius:"var(--r-sm)",
+                      border:"1px solid var(--border)", background:"var(--surface)",
+                      fontFamily:"inherit", cursor:"pointer", flexShrink:0 }}>
+                    <option value="OWNER">בעלים</option>
+                    <option value="ADMIN">מנהל</option>
+                    <option value="MEMBER">חבר צוות</option>
+                  </select>
+                  {saving === m.userId && <Loader2 size={13} className="animate-spin" style={{ color:"var(--text-faint)", flexShrink:0 }}/>}
+                  {/* Remove */}
+                  <button onClick={() => removeMember(m.userId)} disabled={removing === m.userId}
+                    style={{ background:"none", border:"none", cursor:"pointer",
+                      color:"var(--red)", padding:4, flexShrink:0, marginTop:2 }}>
+                    {removing === m.userId ? <Loader2 size={13} className="animate-spin"/> : <X size={13}/>}
+                  </button>
                 </div>
-                <select value={m.role}
-                  onChange={e => changeRole(m.userId, e.target.value)}
-                  disabled={saving === m.userId}
-                  style={{ fontSize:12, padding:"3px 6px", borderRadius:"var(--r-sm)",
-                    border:"1px solid var(--border)", background:"var(--surface)",
-                    fontFamily:"inherit", cursor:"pointer" }}>
-                  <option value="OWNER">בעלים</option>
-                  <option value="ADMIN">מנהל</option>
-                  <option value="MEMBER">חבר צוות</option>
-                </select>
-                {saving === m.userId && <Loader2 size={13} className="animate-spin" style={{ color:"var(--text-faint)" }}/>}
-                <button onClick={() => removeMember(m.userId)} disabled={removing === m.userId}
-                  style={{ background:"none", border:"none", cursor:"pointer",
-                    color:"var(--red)", padding:4, flexShrink:0 }}>
-                  {removing === m.userId ? <Loader2 size={13} className="animate-spin"/> : <X size={13}/>}
-                </button>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
         {/* Add member form */}
         <div style={{ borderTop:"1px solid var(--border)", paddingTop:14 }}>
-          <p style={{ fontSize:12, fontWeight:600, marginBottom:10 }}>הוסף חבר</p>
+          <p style={{ fontSize:12, fontWeight:600, marginBottom:10 }}>הוסף חבר צוות</p>
           <form onSubmit={addMember} style={{ display:"flex", flexDirection:"column", gap:10 }}>
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
               <div className="field">
@@ -348,7 +507,7 @@ function MembersModal({ agency, onClose }: { agency: Agency; onClose: () => void
                   placeholder="user@example.com"/>
               </div>
               <div className="field">
-                <label className="field-label">תפקיד</label>
+                <label className="field-label">הרשאה</label>
                 <select className="rk-input" value={addRole} onChange={e=>setAddRole(e.target.value)}
                   style={{ fontFamily:"inherit" }}>
                   <option value="OWNER">בעלים</option>
@@ -357,27 +516,234 @@ function MembersModal({ agency, onClose }: { agency: Agency; onClose: () => void
                 </select>
               </div>
             </div>
-            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
-              <div className="field">
-                <label className="field-label">שם (משתמש חדש)</label>
-                <input className="rk-input" value={addName} onChange={e=>setAddName(e.target.value)}
-                  placeholder="ישראל ישראלי"/>
-              </div>
-              <div className="field">
-                <label className="field-label">סיסמה (משתמש חדש)</label>
-                <input className="rk-input" type="password" value={addPw}
-                  onChange={e=>setAddPw(e.target.value)} dir="ltr" placeholder="מינימום 8 תווים"/>
-              </div>
-            </div>
+            <p style={{ fontSize:11, color:"var(--text-faint)", margin:0 }}>
+              המשתמש יקבל מייל עם קישור להגדרת סיסמא וכניסה ראשונה.
+            </p>
             <Err msg={addErr}/>
+            {addSetupUrl && (
+              <div style={{ padding:"10px 12px", background:"#fff7ed",
+                border:"1px solid #fed7aa", borderRadius:"var(--r-md)", fontSize:12 }}>
+                <p style={{ margin:"0 0 6px", fontWeight:600, color:"#92400e" }}>
+                  שליחת המייל נכשלה — שתף ידנית:
+                </p>
+                <div style={{ display:"flex", gap:6, alignItems:"center" }}>
+                  <span style={{ flex:1, fontFamily:"monospace", direction:"ltr",
+                    wordBreak:"break-all", color:"#1E2D7D", fontSize:11 }}>{addSetupUrl}</span>
+                  <button type="button" className="btn btn-ghost sm"
+                    onClick={() => navigator.clipboard.writeText(addSetupUrl)}
+                    style={{ flexShrink:0, fontSize:11 }}>העתק</button>
+                </div>
+              </div>
+            )}
             <button type="submit" disabled={adding || !addEmail} className="btn btn-primary sm"
               style={{ display:"inline-flex", alignItems:"center", gap:5, alignSelf:"start" }}>
               {adding ? <Loader2 size={12} className="animate-spin"/> : <UserPlus size={12}/>}
-              הוסף לסוכנות
+              הוסף חבר צוות
             </button>
           </form>
         </div>
       </div>
+    </Modal>
+  );
+}
+
+// ── Edit User Modal ───────────────────────────────────────────────────────────
+
+type RoleOption = {
+  value: string;
+  label: string;
+  desc: string;
+  color: string;
+  bg: string;
+  border: string;
+  icon: React.ElementType;
+};
+
+const ROLE_OPTIONS: RoleOption[] = [
+  { value:"MEMBER",      label:"חבר צוות",  desc:"צפייה בלבד",                   color:"#374151", bg:"#f9fafb",              border:"#e5e7eb",              icon:Shield },
+  { value:"ADMIN",       label:"מנהל",       desc:"עריכה והוספת חברי צוות",        color:"#1E2D7D", bg:"rgba(30,45,125,0.06)", border:"rgba(30,45,125,0.2)", icon:ShieldCheck },
+  { value:"OWNER",       label:"בעלים",      desc:"שליטה מלאה בסוכנות",            color:"#d97706", bg:"rgba(217,119,6,0.08)", border:"rgba(217,119,6,0.25)", icon:ShieldCheck },
+  { value:"SUPER_ADMIN", label:"Super Admin", desc:"ניהול פלטפורמה מלא",            color:"#0891b2", bg:"rgba(8,145,178,0.08)", border:"rgba(8,145,178,0.25)", icon:ShieldCheck },
+];
+
+function RolePicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+      <span className="field-label">תפקיד והרשאה</span>
+      <div style={{ display:"flex", flexDirection:"column", gap:5 }}>
+        {ROLE_OPTIONS.map(opt => {
+          const active = value === opt.value;
+          const Icon = opt.icon;
+          return (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => onChange(opt.value)}
+              style={{
+                display:"flex", alignItems:"center", gap:10,
+                padding:"10px 14px", borderRadius:"var(--r-md)", cursor:"pointer",
+                textAlign:"start", width:"100%",
+                background: active ? opt.bg : "var(--surface-sunken)",
+                border: `2px solid ${active ? opt.border : "var(--border)"}`,
+                transition:"all 0.12s",
+              }}>
+              <div style={{ width:20, height:20, borderRadius:"50%", flexShrink:0,
+                border:`2px solid ${active ? opt.color : "var(--border)"}`,
+                display:"grid", placeItems:"center",
+                background: active ? opt.color : "transparent" }}>
+                {active && <div style={{ width:7, height:7, borderRadius:"50%", background:"white" }}/>}
+              </div>
+              <Icon size={15} style={{ color: active ? opt.color : "var(--text-faint)", flexShrink:0 }}/>
+              <div style={{ flex:1, lineHeight:1.3 }}>
+                <div style={{ fontSize:13, fontWeight:active ? 700 : 500,
+                  color: active ? opt.color : "var(--text)" }}>{opt.label}</div>
+                <div style={{ fontSize:11, color:"var(--text-faint)" }}>{opt.desc}</div>
+              </div>
+              {active && <Check size={13} style={{ color:opt.color, flexShrink:0 }}/>}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function resolveRoleValue(user: PlatformUser): string {
+  if (user.isSuperAdmin) return "SUPER_ADMIN";
+  return user.memberships[0]?.role ?? "MEMBER";
+}
+
+function EditUserModal({ user, onClose, onSaved }: {
+  user: PlatformUser;
+  onClose: () => void;
+  onSaved: (updated: PlatformUser) => void;
+}) {
+  const [name, setName]     = useState(user.name ?? "");
+  const [email, setEmail]   = useState(user.email);
+  const [roleValue, setRoleValue] = useState(resolveRoleValue(user));
+  const [saving, setSaving] = useState(false);
+  const [err, setErr]       = useState("");
+
+  const [resetting, setResetting]     = useState(false);
+  const [resetResult, setResetResult] = useState<{ ok: boolean; url?: string } | null>(null);
+  const [deleting, setDeleting]       = useState(false);
+
+  async function deleteUser() {
+    if (!confirm(`למחוק את המשתמש "${user.name ?? user.email}"? פעולה זו בלתי הפיכה.`)) return;
+    setDeleting(true);
+    const res = await fetch(`/api/super-admin/users/${user.id}`, { method: "DELETE" });
+    const data = await res.json();
+    if (!res.ok) { alert(data.error ?? "שגיאה במחיקה"); setDeleting(false); return; }
+    onClose();
+    // Signal parent to remove user from list
+    onSaved({ ...user, id: "__deleted__" });
+  }
+
+  async function save(e: React.FormEvent) {
+    e.preventDefault();
+    setErr(""); setSaving(true);
+    try {
+      const isSuperAdmin = roleValue === "SUPER_ADMIN";
+      const membershipRole = isSuperAdmin ? undefined : roleValue;
+      const res = await fetch(`/api/super-admin/users/${user.id}`, {
+        method:"PATCH", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({
+          name: name.trim() || null,
+          email: email.trim(),
+          isSuperAdmin,
+          membershipRole,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setErr(data.error ?? "שגיאה"); return; }
+      onSaved({
+        ...user,
+        name: data.user.name,
+        email: data.user.email,
+        isSuperAdmin: data.user.isSuperAdmin,
+        memberships: membershipRole
+          ? user.memberships.map(m => ({ ...m, role: membershipRole }))
+          : user.memberships,
+      });
+    } finally { setSaving(false); }
+  }
+
+  async function resetPassword() {
+    setResetting(true); setResetResult(null);
+    const res = await fetch(`/api/super-admin/users/${user.id}/reset-password`, { method:"POST" });
+    const data = await res.json();
+    setResetResult({ ok: data.emailSent, url: data.resetUrl });
+    setResetting(false);
+  }
+
+  return (
+    <Modal title={`עריכת משתמש — ${user.name ?? user.email}`} onClose={onClose}>
+      <form onSubmit={save} style={{ display:"flex", flexDirection:"column", gap:14 }}>
+        <div className="field">
+          <label className="field-label">שם מלא</label>
+          <input className="rk-input" value={name} onChange={e=>setName(e.target.value)}
+            placeholder="שם מלא (אופציונלי)"/>
+        </div>
+        <div className="field">
+          <label className="field-label">כתובת מייל *</label>
+          <input className="rk-input" type="email" required dir="ltr"
+            value={email} onChange={e=>setEmail(e.target.value)}/>
+        </div>
+
+        <RolePicker value={roleValue} onChange={setRoleValue}/>
+
+        {err && (
+          <div style={{ display:"flex", gap:6, fontSize:12, color:"var(--red)",
+            background:"var(--red-soft)", borderRadius:"var(--r-sm)", padding:"7px 10px" }}>
+            <AlertCircle size={13}/>{err}
+          </div>
+        )}
+
+        <div style={{ display:"flex", gap:8, justifyContent:"space-between", alignItems:"center",
+          borderTop:"1px solid var(--border)", paddingTop:14, marginTop:4 }}>
+          <div style={{ display:"flex", gap:8 }}>
+            <button type="submit" disabled={saving || deleting} className="btn btn-primary sm"
+              style={{ display:"inline-flex", alignItems:"center", gap:5 }}>
+              {saving ? <Loader2 size={12} className="animate-spin"/> : <Check size={12}/>}
+              שמור שינויים
+            </button>
+            <button type="button" onClick={onClose} className="btn btn-ghost sm">ביטול</button>
+            <button type="button" onClick={deleteUser} disabled={deleting}
+              style={{ display:"inline-flex", alignItems:"center", gap:5,
+                background:"none", border:"1px solid var(--red,#dc2626)", borderRadius:"var(--r-md)",
+                color:"var(--red,#dc2626)", fontSize:12, fontWeight:600, padding:"5px 12px",
+                cursor:"pointer", marginInlineStart:4 }}>
+              {deleting ? <Loader2 size={11} className="animate-spin"/> : <Trash2 size={11}/>}
+              מחק משתמש
+            </button>
+          </div>
+          <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:5 }}>
+            <button type="button" onClick={resetPassword} disabled={resetting}
+              className="btn btn-ghost sm"
+              style={{ display:"inline-flex", alignItems:"center", gap:5,
+                color:"var(--text-muted)", fontSize:12 }}>
+              {resetting ? <Loader2 size={11} className="animate-spin"/> : <RefreshCw size={11}/>}
+              שלח מייל איפוס סיסמא
+            </button>
+            {resetResult && (
+              resetResult.ok
+                ? <span style={{ fontSize:11, color:"#16a34a", display:"inline-flex", alignItems:"center", gap:3 }}>
+                    <CheckCircle2 size={11}/> מייל נשלח
+                  </span>
+                : <div style={{ fontSize:11, display:"flex", alignItems:"center", gap:4 }}>
+                    <span style={{ color:"#ef4444" }}>שליחה נכשלה —</span>
+                    {resetResult.url && (
+                      <button type="button" style={{ fontSize:11, background:"none", border:"none",
+                        cursor:"pointer", color:"var(--accent)", padding:0, textDecoration:"underline" }}
+                        onClick={() => resetResult.url && navigator.clipboard.writeText(resetResult.url)}>
+                        העתק קישור
+                      </button>
+                    )}
+                  </div>
+            )}
+          </div>
+        </div>
+      </form>
     </Modal>
   );
 }
@@ -387,7 +753,8 @@ function MembersModal({ agency, onClose }: { agency: Agency; onClose: () => void
 function UsersTab() {
   const [users, setUsers]     = useState<PlatformUser[]>([]);
   const [loading, setLoading] = useState(true);
-  const [toggling, setToggling] = useState<string | null>(null);
+  const [editUser, setEditUser] = useState<PlatformUser | null>(null);
+  const [search, setSearch]   = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -400,19 +767,6 @@ function UsersTab() {
 
   useEffect(() => { load(); }, [load]);
 
-  async function toggleSA(id: string, current: boolean) {
-    setToggling(id);
-    const res = await fetch(`/api/super-admin/users/${id}`, {
-      method:"PATCH", headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({ isSuperAdmin: !current }),
-    });
-    const data = await res.json();
-    if (res.ok) {
-      setUsers(prev => prev.map(u => u.id===id ? {...u, isSuperAdmin: data.user.isSuperAdmin} : u));
-    }
-    setToggling(null);
-  }
-
   if (loading) return (
     <div style={{ display:"flex", justifyContent:"center", padding:40 }}>
       <Loader2 size={22} className="animate-spin" style={{ color:"var(--text-faint)" }}/>
@@ -420,85 +774,123 @@ function UsersTab() {
   );
 
   return (
-    <div style={{ background:"var(--surface)", border:"1px solid var(--border)",
-      borderRadius:"var(--r-lg)", overflow:"hidden" }}>
-      <div style={{ padding:"16px 20px", borderBottom:"1px solid var(--border)",
-        display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-        <h2 style={{ fontSize:14, fontWeight:700, margin:0 }}>
-          משתמשי פלטפורמה ({users.length})
-        </h2>
-        <button onClick={load} className="btn btn-ghost sm"
-          style={{ display:"inline-flex", alignItems:"center", gap:5 }}>
-          <RefreshCw size={12}/> רענן
-        </button>
-      </div>
-      <div style={{ overflowX:"auto" }}>
-        <table style={{ width:"100%", borderCollapse:"collapse", fontSize:13 }}>
-          <thead>
-            <tr style={{ background:"var(--surface-sunken)" }}>
-              {["משתמש", "סוכנויות", "Super-admin", "נוצר"].map(h => (
-                <th key={h} style={{ padding:"9px 16px", textAlign:"start", fontWeight:600,
-                  color:"var(--text-muted)", borderBottom:"1px solid var(--border)", whiteSpace:"nowrap" }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {users.map((u, i) => (
-              <tr key={u.id}
-                style={{ borderBottom: i < users.length-1 ? "1px solid var(--border-subtle)" : "none" }}>
-                <td style={{ padding:"11px 16px" }}>
-                  <div style={{ fontWeight:600 }}>{u.name ?? u.email}</div>
-                  {u.name && <div style={{ fontSize:11, color:"var(--text-muted)", direction:"ltr" }}>{u.email}</div>}
-                </td>
-                <td style={{ padding:"11px 16px" }}>
-                  {u.memberships.length === 0 ? (
-                    <span style={{ fontSize:12, color:"var(--text-faint)" }}>—</span>
-                  ) : (
-                    <div style={{ display:"flex", flexDirection:"column", gap:2 }}>
-                      {u.memberships.slice(0,3).map((m, j) => (
-                        <span key={j} style={{ fontSize:11, color:"var(--text-muted)" }}>
-                          {m.agency.name} · {ROLE_LABELS[m.role]??m.role}
-                        </span>
-                      ))}
-                      {u.memberships.length > 3 && (
-                        <span style={{ fontSize:11, color:"var(--text-faint)" }}>
-                          +{u.memberships.length - 3} נוספים
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </td>
-                <td style={{ padding:"11px 16px" }}>
-                  <button
-                    onClick={() => toggleSA(u.id, u.isSuperAdmin)}
-                    disabled={toggling === u.id}
-                    style={{ display:"inline-flex", alignItems:"center", gap:5,
-                      background: u.isSuperAdmin ? "rgba(91,194,240,0.15)" : "var(--surface-sunken)",
-                      color: u.isSuperAdmin ? "var(--brand-cyan)" : "var(--text-muted)",
-                      border: `1px solid ${u.isSuperAdmin ? "rgba(91,194,240,0.3)" : "var(--border)"}`,
-                      borderRadius:"var(--r-pill)", padding:"4px 10px", fontSize:11,
-                      fontWeight:600, cursor:"pointer" }}>
-                    {toggling === u.id
-                      ? <Loader2 size={11} className="animate-spin"/>
-                      : u.isSuperAdmin ? <ShieldCheck size={11}/> : <Shield size={11}/>}
-                    {u.isSuperAdmin ? "Super-admin" : "רגיל"}
-                  </button>
-                </td>
-                <td style={{ padding:"11px 16px", color:"var(--text-muted)", fontSize:12, whiteSpace:"nowrap" }}>
-                  {new Date(u.createdAt).toLocaleDateString("he-IL")}
-                </td>
+    <>
+      <div style={{ background:"var(--surface)", border:"1px solid var(--border)",
+        borderRadius:"var(--r-lg)", overflow:"hidden" }}>
+        <div style={{ padding:"16px 20px", borderBottom:"1px solid var(--border)",
+          display:"flex", alignItems:"center", gap:12, flexWrap:"wrap" }}>
+          <h2 style={{ fontSize:14, fontWeight:700, margin:0, marginInlineEnd:"auto" }}>
+            משתמשי פלטפורמה ({users.length})
+          </h2>
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="חיפוש לפי שם או מייל..."
+            style={{ fontSize:13, padding:"6px 12px", border:"1px solid var(--border)",
+              borderRadius:"var(--r-md)", background:"var(--surface-sunken)",
+              outline:"none", width:220, direction:"rtl" }}
+          />
+          <button onClick={load} className="btn btn-ghost sm"
+            style={{ display:"inline-flex", alignItems:"center", gap:5 }}>
+            <RefreshCw size={12}/> רענן
+          </button>
+        </div>
+        <div style={{ overflowX:"auto" }}>
+          <table style={{ width:"100%", borderCollapse:"collapse", fontSize:13 }}>
+            <thead>
+              <tr style={{ background:"var(--surface-sunken)" }}>
+                {["משתמש", "סוכנויות", "הרשאה", "נוצר", ""].map((h,i) => (
+                  <th key={i} style={{ padding:"9px 16px", textAlign:"start", fontWeight:600,
+                    color:"var(--text-muted)", borderBottom:"1px solid var(--border)", whiteSpace:"nowrap" }}>{h}</th>
+                ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {users.filter(u => {
+                if (!search.trim()) return true;
+                const q = search.trim().toLowerCase();
+                return (u.email.toLowerCase().includes(q) || (u.name ?? "").toLowerCase().includes(q));
+              }).map((u, i, arr) => (
+                <tr key={u.id}
+                  style={{ borderBottom: i < arr.length-1 ? "1px solid var(--border-subtle)" : "none" }}>
+                  <td style={{ padding:"11px 16px" }}>
+                    <div style={{ fontWeight:600 }}>{u.name ?? u.email}</div>
+                    {u.name && <div style={{ fontSize:11, color:"var(--text-muted)", direction:"ltr" }}>{u.email}</div>}
+                  </td>
+                  <td style={{ padding:"11px 16px" }}>
+                    {u.memberships.length === 0 ? (
+                      <span style={{ fontSize:12, color:"var(--text-faint)" }}>—</span>
+                    ) : (
+                      <div style={{ display:"flex", flexDirection:"column", gap:2 }}>
+                        {u.memberships.slice(0,3).map((m, j) => (
+                          <span key={j} style={{ fontSize:11, color:"var(--text-muted)" }}>
+                            {m.agency.name} · {ROLE_LABELS[m.role]??m.role}
+                          </span>
+                        ))}
+                        {u.memberships.length > 3 && (
+                          <span style={{ fontSize:11, color:"var(--text-faint)" }}>
+                            +{u.memberships.length - 3} נוספים
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </td>
+                  <td style={{ padding:"11px 16px" }}>
+                    {u.isSuperAdmin ? (
+                      <span style={{ display:"inline-flex", alignItems:"center", gap:4, fontSize:11,
+                        background:"rgba(91,194,240,0.15)", color:"var(--brand-cyan)",
+                        border:"1px solid rgba(91,194,240,0.3)", borderRadius:"var(--r-pill)",
+                        padding:"3px 10px", fontWeight:600 }}>
+                        <ShieldCheck size={10}/> Super-admin
+                      </span>
+                    ) : (
+                      <span style={{ fontSize:11, color:"var(--text-muted)",
+                        background:"var(--surface-sunken)", border:"1px solid var(--border)",
+                        borderRadius:"var(--r-pill)", padding:"3px 10px" }}>רגיל</span>
+                    )}
+                  </td>
+                  <td style={{ padding:"11px 16px", color:"var(--text-muted)", fontSize:12, whiteSpace:"nowrap" }}>
+                    {new Date(u.createdAt).toLocaleDateString("he-IL")}
+                  </td>
+                  <td style={{ padding:"11px 16px", textAlign:"end" }}>
+                    <button onClick={() => setEditUser(u)}
+                      title="עריכה"
+                      style={{ background:"none", border:"none", cursor:"pointer",
+                        color:"var(--text-muted)", padding:5, borderRadius:"var(--r-sm)" }}>
+                      <Pencil size={13}/>
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
-    </div>
+
+      {editUser && (
+        <EditUserModal
+          user={editUser}
+          onClose={() => setEditUser(null)}
+          onSaved={(updated) => {
+            if (updated.id === "__deleted__") {
+              setUsers(prev => prev.filter(u => u.id !== editUser!.id));
+            } else {
+              setUsers(prev => prev.map(u => u.id === updated.id ? updated : u));
+            }
+            setEditUser(null);
+          }}
+        />
+      )}
+    </>
   );
 }
 
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export function SuperAdminClient({ initialStats }: { initialStats: Stats }) {
+  const router = useRouter();
+  const { update: updateSession } = useSession();
+
   const [activeTab, setActiveTab]     = useState<"agencies" | "users">("agencies");
   const [agencies, setAgencies]       = useState<Agency[]>([]);
   const [stats, setStats]             = useState<Stats>(initialStats);
@@ -507,6 +899,9 @@ export function SuperAdminClient({ initialStats }: { initialStats: Stats }) {
   const [editAgency, setEditAgency]   = useState<Agency | null>(null);
   const [membersAgency, setMembersAgency] = useState<Agency | null>(null);
   const [deleting, setDeleting]       = useState<string | null>(null);
+  const [resending, setResending]     = useState<string | null>(null);
+  const [resendResult, setResendResult] = useState<{ agencyId: string; setupUrl?: string; ok: boolean } | null>(null);
+  const [entering, setEntering]       = useState<string | null>(null);
 
   const loadAgencies = useCallback(async () => {
     setLoading(true);
@@ -520,12 +915,34 @@ export function SuperAdminClient({ initialStats }: { initialStats: Stats }) {
 
   useEffect(() => { loadAgencies(); }, [loadAgencies]);
 
+  async function resendSetup(a: Agency) {
+    setResending(a.id); setResendResult(null);
+    const res = await fetch(`/api/super-admin/agencies/${a.id}/resend-setup`, { method: "POST" });
+    const data = await res.json();
+    if (!res.ok) { alert(data.error ?? "שגיאה"); setResending(null); return; }
+    setResendResult({ agencyId: a.id, setupUrl: data.setupUrl, ok: data.emailSent });
+    setResending(null);
+  }
+
   async function deleteAgency(a: Agency) {
     if (!confirm(`למחוק את "${a.name}"? פעולה זו בלתי הפיכה — כל הלקוחות, הדוחות והחיבורים יימחקו.`)) return;
     setDeleting(a.id);
     await fetch(`/api/super-admin/agencies/${a.id}`, { method:"DELETE" });
     setAgencies(prev => prev.filter(ag => ag.id !== a.id));
     setDeleting(null);
+  }
+
+  async function enterAgency(a: Agency) {
+    setEntering(a.id);
+    try {
+      const res = await fetch(`/api/super-admin/agencies/${a.id}/enter`, { method: "POST" });
+      if (!res.ok) { alert("שגיאה בכניסה לסוכנות"); return; }
+      // Re-issue JWT with new agencyId (super-admin bypass in jwt callback)
+      await updateSession({ agencyId: a.id });
+      router.push("/admin");
+    } finally {
+      setEntering(null);
+    }
   }
 
   const TAB_STYLE = (active: boolean): React.CSSProperties => ({
@@ -537,14 +954,6 @@ export function SuperAdminClient({ initialStats }: { initialStats: Stats }) {
 
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:28 }}>
-
-      {/* Stats */}
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))", gap:14 }}>
-        <StatCard icon={Building2} label="סוכנויות"      value={stats.agencyCount} color="#1E2D7D"/>
-        <StatCard icon={Users}     label="משתמשים"      value={stats.userCount}   color="#5BC2F0"/>
-        <StatCard icon={Globe}     label="לקוחות פעילים" value={stats.clientCount} color="#16a34a"/>
-        <StatCard icon={FileText}  label="דוחות"         value={stats.reportCount} color="#f59e0b"/>
-      </div>
 
       {/* Tabs */}
       <div style={{ borderBottom:"1px solid var(--border)", display:"flex", gap:0 }}>
@@ -582,7 +991,7 @@ export function SuperAdminClient({ initialStats }: { initialStats: Stats }) {
                 <table style={{ width:"100%", borderCollapse:"collapse", fontSize:13 }}>
                   <thead>
                     <tr style={{ background:"var(--surface-sunken)" }}>
-                      {["סוכנות", "בעלים", "חברים", "לקוחות", "דוחות", "Google", "תאריך", "פעולות"].map(h => (
+                      {["סוכנות", "בעלים", "מוגדר", "חברים", "לקוחות", "דוחות", "Google", "תאריך", "פעולות"].map(h => (
                         <th key={h} style={{ padding:"9px 14px", textAlign:"start", fontWeight:600,
                           color:"var(--text-muted)", borderBottom:"1px solid var(--border)", whiteSpace:"nowrap" }}>{h}</th>
                       ))}
@@ -591,18 +1000,67 @@ export function SuperAdminClient({ initialStats }: { initialStats: Stats }) {
                   <tbody>
                     {agencies.map((a, i) => (
                       <tr key={a.id}
-                        style={{ borderBottom: i < agencies.length-1 ? "1px solid var(--border-subtle)" : "none" }}>
+                        onClick={() => enterAgency(a)}
+                        style={{ borderBottom: i < agencies.length-1 ? "1px solid var(--border-subtle)" : "none",
+                          cursor: entering === a.id ? "wait" : "pointer" }}
+                        onMouseEnter={e => (e.currentTarget.style.background = "var(--surface-sunken)")}
+                        onMouseLeave={e => (e.currentTarget.style.background = "")}>
                         <td style={{ padding:"11px 14px" }}>
                           <div style={{ fontWeight:600 }}>{a.name}</div>
                           <div style={{ fontSize:11, color:"var(--text-faint)", fontFamily:"monospace" }}>{a.slug}</div>
                         </td>
-                        <td style={{ padding:"11px 14px" }}>
+                        <td style={{ padding:"11px 14px" }} onClick={e => e.stopPropagation()}>
                           {a.owner ? (
                             <div>
-                              <div style={{ fontSize:12 }}>{a.owner.name ?? "—"}</div>
+                              <div style={{ fontSize:12, display:"flex", alignItems:"center", gap:5 }}>
+                                {a.owner.name ?? "—"}
+                                {a.ownerSetupPending && (
+                                  <span style={{ fontSize:10, background:"#fef3c7", color:"#92400e",
+                                    border:"1px solid #fcd34d", borderRadius:4, padding:"1px 5px", fontWeight:600 }}>
+                                    ⚠ לא הוגדר
+                                  </span>
+                                )}
+                              </div>
                               <div style={{ fontSize:11, color:"var(--text-muted)", direction:"ltr" }}>{a.owner.email}</div>
+                              {a.ownerSetupPending && (
+                                <>
+                                  <button
+                                    onClick={() => resendSetup(a)}
+                                    disabled={resending === a.id}
+                                    style={{ marginTop:4, fontSize:10, background:"none", border:"1px solid var(--border)",
+                                      borderRadius:4, cursor:"pointer", padding:"2px 7px", color:"var(--text-muted)",
+                                      display:"inline-flex", alignItems:"center", gap:3 }}>
+                                    {resending === a.id
+                                      ? <Loader2 size={9} className="animate-spin"/>
+                                      : <RefreshCw size={9}/>}
+                                    שלח מייל שוב
+                                  </button>
+                                  {resendResult?.agencyId === a.id && (
+                                    <div style={{ marginTop:4 }}>
+                                      {resendResult.ok ? (
+                                        <span style={{ fontSize:10, color:"var(--green,#16a34a)" }}>
+                                          <CheckCircle2 size={10} style={{ display:"inline", marginLeft:2 }}/>
+                                          נשלח
+                                        </span>
+                                      ) : (
+                                        <div style={{ fontSize:10 }}>
+                                          <span style={{ color:"#ef4444" }}>מייל נכשל — </span>
+                                          <button type="button" style={{ fontSize:10, background:"none", border:"none",
+                                            cursor:"pointer", color:"#1E2D7D", textDecoration:"underline", padding:0 }}
+                                            onClick={() => resendResult.setupUrl && navigator.clipboard.writeText(resendResult.setupUrl)}>
+                                            העתק קישור
+                                          </button>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                </>
+                              )}
                             </div>
                           ) : <span style={{ color:"var(--text-faint)", fontSize:12 }}>—</span>}
+                        </td>
+                        <td style={{ padding:"11px 14px" }}>
+                          <SetupBar percent={a.setupPercent} checks={a.setupChecks} />
                         </td>
                         <td style={{ padding:"11px 14px", textAlign:"center" }}>{a.memberCount}</td>
                         <td style={{ padding:"11px 14px", textAlign:"center" }}>{a.clientCount}</td>
@@ -613,19 +1071,32 @@ export function SuperAdminClient({ initialStats }: { initialStats: Stats }) {
                         <td style={{ padding:"11px 14px", color:"var(--text-muted)", fontSize:12, whiteSpace:"nowrap" }}>
                           {new Date(a.createdAt).toLocaleDateString("he-IL")}
                         </td>
-                        <td style={{ padding:"11px 14px" }}>
-                          <div style={{ display:"flex", gap:4, justifyContent:"flex-end" }}>
-                            <button onClick={() => setMembersAgency(a)} title="ניהול חברים"
+                        <td style={{ padding:"11px 14px" }} onClick={e => e.stopPropagation()}>
+                          <div style={{ display:"flex", gap:4, justifyContent:"flex-end", alignItems:"center" }}>
+                            {entering === a.id && (
+                              <Loader2 size={12} className="animate-spin" style={{ color:"var(--accent)" }}/>
+                            )}
+                            <button onClick={e => { e.stopPropagation(); enterAgency(a); }}
+                              disabled={entering === a.id}
+                              title="כנס לסוכנות"
+                              style={{ background:"none", border:"none", cursor:"pointer",
+                                color:"var(--accent)", padding:5, borderRadius:"var(--r-sm)" }}>
+                              <LogIn size={13}/>
+                            </button>
+                            <button onClick={e => { e.stopPropagation(); setMembersAgency(a); }}
+                              title="ניהול חברים"
                               style={{ background:"none", border:"none", cursor:"pointer",
                                 color:"var(--text-muted)", padding:5, borderRadius:"var(--r-sm)" }}>
                               <Users size={13}/>
                             </button>
-                            <button onClick={() => setEditAgency(a)} title="עריכה"
+                            <button onClick={e => { e.stopPropagation(); setEditAgency(a); }}
+                              title="עריכה"
                               style={{ background:"none", border:"none", cursor:"pointer",
                                 color:"var(--text-muted)", padding:5, borderRadius:"var(--r-sm)" }}>
                               <Pencil size={13}/>
                             </button>
-                            <button onClick={() => deleteAgency(a)} disabled={deleting === a.id}
+                            <button onClick={e => { e.stopPropagation(); deleteAgency(a); }}
+                              disabled={deleting === a.id}
                               title="מחק סוכנות"
                               style={{ background:"none", border:"none", cursor:"pointer",
                                 color:"var(--red)", padding:5, borderRadius:"var(--r-sm)" }}>
