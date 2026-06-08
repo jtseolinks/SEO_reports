@@ -58,6 +58,21 @@ export const authOptions: NextAuthOptions = {
       },
     }),
   ],
+  events: {
+    // On every successful login, proactively refresh the Google (GSC/GA4)
+    // access token. `force` retries even when a prior failure left the
+    // connection flagged REQUIRES_REAUTH, so a stuck connection recovers
+    // automatically as long as the refresh token is still valid — no manual
+    // disconnect/reconnect needed. Fire-and-forget so login latency is unaffected.
+    async signIn() {
+      import("./google-oauth")
+        .then(({ getValidAccessToken }) => getValidAccessToken({ force: true }))
+        .catch(() => {
+          // Best-effort: a genuinely revoked/expired refresh token still needs a
+          // manual reconnect, which the dashboard surfaces separately.
+        });
+    },
+  },
   callbacks: {
     async jwt({ token, user }) {
       if (user) {

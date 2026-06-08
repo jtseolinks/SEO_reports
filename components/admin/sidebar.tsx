@@ -6,6 +6,7 @@ import { useSession, signOut } from "next-auth/react";
 import {
   LayoutDashboard, Users, FileText, Plug, Settings, ChevronDown,
 } from "lucide-react";
+import { HashMark } from "@/components/brand/hash-mark";
 
 const NAV_MANAGEMENT = [
   { href: "/admin",         label: "לוח בקרה",    icon: LayoutDashboard, exact: true, countKey: null },
@@ -41,7 +42,7 @@ export function Sidebar({ counts }: { counts?: Counts }) {
     <aside className="sidebar">
       {/* Brand */}
       <div className="sidebar-brand">
-        <div className="logo"><span className="hash">#</span></div>
+        <div className="logo"><HashMark size={18} color="var(--brand-cyan)" /></div>
         <div style={{ lineHeight: 1.2 }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: "var(--brand-navy)", letterSpacing: "-0.01em" }}>
             Rankey

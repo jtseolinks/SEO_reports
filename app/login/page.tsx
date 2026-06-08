@@ -4,6 +4,7 @@ import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { AlertCircle, Loader2 } from "lucide-react";
+import { HashMark } from "@/components/brand/hash-mark";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -77,9 +78,7 @@ export default function LoginPage() {
               marginBottom: 12,
             }}
           >
-            <span style={{ color: "var(--brand-cyan)", fontWeight: 700, fontSize: 22, letterSpacing: -1 }}>
-              #
-            </span>
+            <HashMark size={24} color="var(--brand-cyan)" />
           </div>
           <div style={{ color: "white", fontWeight: 700, fontSize: 20, letterSpacing: "-0.02em" }}>
             Rankey

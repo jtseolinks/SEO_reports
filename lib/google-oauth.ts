@@ -81,10 +81,15 @@ export async function getGoogleConnection(): Promise<GoogleConnection | null> {
   });
 }
 
-export async function getValidAccessToken(): Promise<string | null> {
+export async function getValidAccessToken(
+  options?: { force?: boolean }
+): Promise<string | null> {
   const connection = await getGoogleConnection();
   if (!connection) return null;
-  if (connection.status === "REQUIRES_REAUTH") return null;
+  // When `force` is set (e.g. on login) we retry the refresh even if a previous
+  // attempt flagged the connection as REQUIRES_REAUTH — a stuck status caused by
+  // a transient failure can then self-heal as long as the refresh token is valid.
+  if (!options?.force && connection.status === "REQUIRES_REAUTH") return null;
   if (!connection.encryptedRefreshToken) return null;
 
   const client = createOAuth2Client();
