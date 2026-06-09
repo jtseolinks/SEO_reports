@@ -1,0 +1,1 @@
+globalThis.__RSC_MANIFEST=(globalThis.__RSC_MANIFEST||{});globalThis.__RSC_MANIFEST["/api/google/ga4-properties/route"]={"moduleLoading":{"prefix":"/_next/"},"ssrModuleMapping":{},"edgeSSRModuleMapping":{},"clientModules":{},"entryCSSFiles":{"C:\\Dev\\seo_reports\\app\\api\\google\\ga4-properties\\route":[]},"rscModuleMapping":{},"edgeRscModuleMapping":{}};

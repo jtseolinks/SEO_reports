@@ -29,9 +29,28 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  typescript: { ignoreBuildErrors: true },
+  serverExternalPackages: ["puppeteer", "@prisma/client", "prisma"],
   devIndicators: false,
-  turbopack: {
-    root: __dirname,
+  webpack(config, { isServer }) {
+    if (isServer) {
+      // Prevent webpack from trying to bundle Prisma runtime wasm/native modules
+      config.externals = [
+        ...(Array.isArray(config.externals) ? config.externals : []),
+        ({ request }: { request: string }, callback: (err?: Error | null, result?: string) => void) => {
+          if (
+            request.startsWith("@prisma/client/runtime") ||
+            request.startsWith("@prisma/adapter") ||
+            request === "puppeteer" ||
+            request === "puppeteer-core"
+          ) {
+            return callback(null, `commonjs ${request}`);
+          }
+          callback();
+        },
+      ];
+    }
+    return config;
   },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];

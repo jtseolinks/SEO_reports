@@ -13,8 +13,10 @@
 # testing
 /coverage
 
-# next.js
-/.next/
+# next.js — include production build, exclude dev cache and source maps
+/.next/dev/
+/.next/cache/
+/.next/**/*.map
 /out/
 
 # production
