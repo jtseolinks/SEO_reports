@@ -5,8 +5,9 @@ import { exchangeCodeAndSave, OAUTH_STATE_COOKIE, parseOAuthState } from "@/lib/
 
 export async function GET(request: NextRequest) {
   const session = await getServerSession(authOptions);
+  const appBase = process.env.APP_URL || new URL(request.url).origin;
   if (!session?.user?.agencyId) {
-    return NextResponse.redirect(new URL("/login", request.url));
+    return NextResponse.redirect(new URL("/login", appBase));
   }
   const activeAgencyId = session.user.agencyId;
 
@@ -16,7 +17,7 @@ export async function GET(request: NextRequest) {
   const state = searchParams.get("state");
 
   if (error) {
-    const redirectUrl = new URL("/admin/google", request.url);
+    const redirectUrl = new URL("/admin/google", appBase);
     redirectUrl.searchParams.set("error", error);
     return NextResponse.redirect(redirectUrl);
   }
@@ -25,7 +26,7 @@ export async function GET(request: NextRequest) {
   // the flow began.
   const expectedState = request.cookies.get(OAUTH_STATE_COOKIE)?.value;
   if (!state || !expectedState || state !== expectedState) {
-    const redirectUrl = new URL("/admin/google", request.url);
+    const redirectUrl = new URL("/admin/google", appBase);
     redirectUrl.searchParams.set("error", "invalid_state");
     const res = NextResponse.redirect(redirectUrl);
     res.cookies.delete(OAUTH_STATE_COOKIE);
@@ -37,7 +38,7 @@ export async function GET(request: NextRequest) {
   // mid-flow workspace switch binding credentials to the wrong agency).
   const stateAgencyId = parseOAuthState(state);
   if (!stateAgencyId || stateAgencyId !== activeAgencyId) {
-    const redirectUrl = new URL("/admin/google", request.url);
+    const redirectUrl = new URL("/admin/google", appBase);
     redirectUrl.searchParams.set("error", "invalid_state");
     const res = NextResponse.redirect(redirectUrl);
     res.cookies.delete(OAUTH_STATE_COOKIE);
@@ -45,21 +46,21 @@ export async function GET(request: NextRequest) {
   }
 
   if (!code) {
-    const redirectUrl = new URL("/admin/google", request.url);
+    const redirectUrl = new URL("/admin/google", appBase);
     redirectUrl.searchParams.set("error", "missing_code");
     return NextResponse.redirect(redirectUrl);
   }
 
   try {
     await exchangeCodeAndSave(activeAgencyId, code);
-    const redirectUrl = new URL("/admin/google", request.url);
+    const redirectUrl = new URL("/admin/google", appBase);
     redirectUrl.searchParams.set("success", "1");
     const res = NextResponse.redirect(redirectUrl);
     res.cookies.delete(OAUTH_STATE_COOKIE);
     return res;
   } catch (err) {
     console.error("Google OAuth callback error:", err);
-    const redirectUrl = new URL("/admin/google", request.url);
+    const redirectUrl = new URL("/admin/google", appBase);
     redirectUrl.searchParams.set(
       "error",
       err instanceof Error ? err.message : "token_exchange_failed"
