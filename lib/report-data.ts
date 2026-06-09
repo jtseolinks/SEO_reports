@@ -1,4 +1,4 @@
-import { getAuthenticatedClient } from "./google-oauth";
+import { getAuthenticatedClient, getValidAccessToken } from "./google-oauth";
 import { fetchGscSummary, fetchGscDailyTrend, aggregateGsc, type GscRow } from "./gsc-api";
 import { fetchGa4OrganicSummary, fetchGa4OrganicLandingPages } from "./ga4-api";
 import { prisma } from "./prisma";
@@ -107,8 +107,10 @@ export async function buildReportData(
     ? { ...customDates, label: `${customDates.startDate} – ${customDates.endDate}` }
     : defaultCurrent;
 
+  // Force-refresh the token so the cron job works even after a prior transient error.
+  await getValidAccessToken(agencyId, { force: true });
   const auth = await getAuthenticatedClient(agencyId);
-  if (!auth) throw new Error("Google account not connected");
+  if (!auth) throw new Error("Google account not connected or token permanently revoked");
 
   const hasGa4 = !!ga4PropertyId;
 

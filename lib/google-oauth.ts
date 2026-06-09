@@ -161,10 +161,16 @@ export async function getValidAccessToken(
     return credentials.access_token ?? null;
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err);
+    // Only mark REQUIRES_REAUTH for permanent OAuth errors (token revoked/expired by user).
+    // Transient errors (network, rate-limit, server error) use ERROR so the next attempt retries.
+    const isPermanent =
+      /invalid_grant|token[_ ]has been expired or revoked|Token has been expired or revoked|access_denied|invalid_client/i.test(
+        errorMessage
+      );
     await prisma.googleConnection.update({
       where: { id: connection.id },
       data: {
-        status: "REQUIRES_REAUTH",
+        status: isPermanent ? "REQUIRES_REAUTH" : "ERROR",
         lastError: errorMessage,
       },
     });
@@ -175,10 +181,16 @@ export async function getValidAccessToken(
 export async function getAuthenticatedClient(agencyId: string): Promise<OAuth2Client | null> {
   const connection = await getGoogleConnection(agencyId);
   if (!connection || !connection.encryptedRefreshToken) return null;
-  if (connection.status === "REQUIRES_REAUTH") return null;
 
   const client = createOAuth2Client();
   const refreshToken = decrypt(connection.encryptedRefreshToken);
-  client.setCredentials({ refresh_token: refreshToken });
+
+  // Always force-refresh the access token. This self-heals REQUIRES_REAUTH and ERROR
+  // states caused by transient failures — no manual disconnect/reconnect needed.
+  // Only returns null when the refresh token itself is permanently revoked.
+  const accessToken = await getValidAccessToken(agencyId, { force: true });
+  if (!accessToken) return null;
+
+  client.setCredentials({ refresh_token: refreshToken, access_token: accessToken });
   return client;
 }

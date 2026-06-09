@@ -87,18 +87,33 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   events: {
-    // On every successful login, proactively refresh the active agency's Google
-    // (GSC/GA4) token. `force` retries even when a prior failure left the
-    // connection flagged REQUIRES_REAUTH, so a stuck connection recovers
-    // automatically as long as the refresh token is still valid. Fire-and-forget.
+    // On every successful login:
+    // 1. Force-refresh the Google access token (self-heals transient/stuck errors).
+    // 2. Make a live GSC ping (listGscSites) to confirm the connection works and
+    //    reset the status to CONNECTED — replacing the "disconnect → reconnect" flow.
+    // Fire-and-forget; login is never blocked by Google API latency.
     async signIn({ user }) {
       const agencyId = (user as { agencyId?: string | null }).agencyId;
       if (!agencyId) return;
-      import("./google-oauth")
-        .then(({ getValidAccessToken }) => getValidAccessToken(agencyId, { force: true }))
+      Promise.all([
+        import("./google-oauth"),
+        import("./gsc-api"),
+        import("./prisma"),
+      ])
+        .then(async ([{ getValidAccessToken, getAuthenticatedClient }, { listGscSites }, { prisma }]) => {
+          await getValidAccessToken(agencyId, { force: true });
+          const auth = await getAuthenticatedClient(agencyId);
+          if (!auth) return;
+          // Verify the connection is live; on success clear any prior error state.
+          await listGscSites(auth);
+          await prisma.googleConnection.updateMany({
+            where: { agencyId },
+            data: { status: "CONNECTED", lastError: null },
+          });
+        })
         .catch(() => {
-          // Best-effort: a genuinely revoked/expired refresh token still needs a
-          // manual reconnect, which the dashboard surfaces separately.
+          // Best-effort: a genuinely revoked token still needs a manual reconnect,
+          // which the dashboard surfaces separately.
         });
     },
   },

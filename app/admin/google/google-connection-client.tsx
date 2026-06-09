@@ -124,7 +124,6 @@ export function GoogleConnectionClient({
   }
 
   const statCols = [
-    { tag: "#R",  tagBg: "#EEF0F9", tagColor: "#1E2D7D", label: "מנוטרים במערכת",         value: stats.monitored },
     { tag: "GBP", tagBg: "#FDF3E1", tagColor: "#B45309", label: "פרופילי Business Profile", value: "—" },
     { tag: "GA4", tagBg: "#E6F4EA", tagColor: "#15803D", label: "נכסי Analytics 4",         value: stats.ga4Count },
     { tag: "GSC", tagBg: "#E0F4FF", tagColor: "#0369A1", label: "נכסי Search Console",      value: stats.gscCount },
@@ -243,13 +242,13 @@ export function GoogleConnectionClient({
 
         {/* Stats grid */}
         {isConnected && (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", borderTop: "1.5px solid var(--border-subtle)" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", borderTop: "1.5px solid var(--border-subtle)" }}>
             {statCols.map((col, i) => (
               <div
                 key={col.tag}
                 style={{
                   padding: "16px 20px",
-                  borderInlineEnd: i < 3 ? "1px solid var(--border-subtle)" : undefined,
+                  borderInlineEnd: i < 2 ? "1px solid var(--border-subtle)" : undefined,
                   textAlign: "right",
                 }}
               >
