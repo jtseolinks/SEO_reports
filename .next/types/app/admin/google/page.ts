@@ -1,4 +1,4 @@
-// File: C:\Dev\seo_reports\app\admin\google\page.tsx
+// File: C:\Users\97252\Desktop\SEO_reports\app\admin\google\page.tsx
 import * as entry from '../../../../../app/admin/google/page.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 

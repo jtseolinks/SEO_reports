@@ -30,7 +30,7 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   typescript: { ignoreBuildErrors: true },
-  serverExternalPackages: ["puppeteer", "@prisma/client", "prisma"],
+  serverExternalPackages: ["puppeteer-core", "@sparticuz/chromium", "@prisma/client", "prisma"],
   devIndicators: false,
   webpack(config, { isServer }) {
     if (isServer) {
@@ -41,8 +41,8 @@ const nextConfig: NextConfig = {
           if (
             request.startsWith("@prisma/client/runtime") ||
             request.startsWith("@prisma/adapter") ||
-            request === "puppeteer" ||
-            request === "puppeteer-core"
+            request === "puppeteer-core" ||
+            request === "@sparticuz/chromium"
           ) {
             return callback(null, `commonjs ${request}`);
           }

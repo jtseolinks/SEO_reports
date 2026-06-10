@@ -1,4 +1,4 @@
-// File: C:\Dev\seo_reports\app\api\notifications\route.ts
+// File: C:\Users\97252\Desktop\SEO_reports\app\api\notifications\route.ts
 import * as entry from '../../../../../app/api/notifications/route.js'
 import type { NextRequest } from 'next/server.js'
 

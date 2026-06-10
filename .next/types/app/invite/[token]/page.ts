@@ -1,4 +1,4 @@
-// File: C:\Dev\seo_reports\app\invite\[token]\page.tsx
+// File: C:\Users\97252\Desktop\SEO_reports\app\invite\[token]\page.tsx
 import * as entry from '../../../../../app/invite/[token]/page.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 

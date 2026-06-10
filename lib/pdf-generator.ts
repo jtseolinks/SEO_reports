@@ -12,11 +12,25 @@ export async function generatePdf(
 
   const filePath = path.join(dir, path.basename(filename));
 
-  const puppeteer = await import("puppeteer");
-  const browser = await puppeteer.default.launch({
-    headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
-  });
+  // Single PDF engine: puppeteer-core. On Linux servers (Cloudways) we can't
+  // install Chrome's system libraries without root, so use @sparticuz/chromium
+  // which bundles them; on local dev machines use the installed Chrome.
+  const puppeteer = await import("puppeteer-core");
+  let browser;
+  if (process.platform === "linux") {
+    const chromium = (await import("@sparticuz/chromium")).default;
+    browser = await puppeteer.default.launch({
+      executablePath: await chromium.executablePath(),
+      args: [...chromium.args, "--disable-dev-shm-usage"],
+      headless: true,
+    });
+  } else {
+    browser = await puppeteer.default.launch({
+      channel: "chrome",
+      headless: true,
+      args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
+    });
+  }
 
   try {
     const page = await browser.newPage();

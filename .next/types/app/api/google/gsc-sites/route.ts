@@ -1,4 +1,4 @@
-// File: C:\Dev\seo_reports\app\api\google\gsc-sites\route.ts
+// File: C:\Users\97252\Desktop\SEO_reports\app\api\google\gsc-sites\route.ts
 import * as entry from '../../../../../../app/api/google/gsc-sites/route.js'
 import type { NextRequest } from 'next/server.js'
 

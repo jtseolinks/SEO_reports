@@ -1,4 +1,4 @@
-// File: C:\Dev\seo_reports\app\admin\clients\import-gsc\page.tsx
+// File: C:\Users\97252\Desktop\SEO_reports\app\admin\clients\import-gsc\page.tsx
 import * as entry from '../../../../../../app/admin/clients/import-gsc/page.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 
