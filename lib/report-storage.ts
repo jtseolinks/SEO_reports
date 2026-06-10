@@ -9,8 +9,15 @@ export const REPORTS_DIR = path.join(process.cwd(), "private", "reports");
 
 // Public URL path used in the DB (pdfUrl) and the admin UI. Handled by the
 // authenticated route handler, not by static file serving.
+//
+// The trailing "/file" segment is load-bearing on Cloudways: the platform's
+// Apache serves any URL ending in a static extension (.pdf, .jpg, ...) directly
+// from public_html, bypassing the Node reverse proxy. A URL ending in ".pdf"
+// therefore never reaches this app's route. Ending the path in "/file" (no
+// extension) keeps the request on the Node side. The route segment for the PDF
+// name still carries ".pdf"; only the URL's final segment must be extensionless.
 export function reportPublicUrl(agencyId: string, filename: string): string {
-  return `/reports/${agencyId}/${filename}`;
+  return `/reports/${agencyId}/${filename}/file`;
 }
 
 // Resolve an (agencyId, filename) pair to an absolute path on disk.

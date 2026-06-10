@@ -3,10 +3,9 @@ import { serveReport } from "@/lib/serve-report";
 
 type Params = { params: Promise<{ agencyId: string; filename: string }> };
 
-// Legacy report URL (ends in ".pdf"). Kept so pre-existing pdfUrl rows still
-// resolve when accessed directly via Node. New URLs use the "/file" variant —
-// on Cloudways a ".pdf"-terminated URL is intercepted by Apache and never
-// reaches this route. See reportPublicUrl() in lib/report-storage.ts.
+// Canonical report URL: ends in "/file" (no static extension) so Cloudways'
+// Apache forwards it to Node instead of serving it statically. See
+// reportPublicUrl() in lib/report-storage.ts for the full rationale.
 export async function GET(_req: NextRequest, { params }: Params) {
   const { agencyId, filename } = await params;
   return serveReport(agencyId, filename);
