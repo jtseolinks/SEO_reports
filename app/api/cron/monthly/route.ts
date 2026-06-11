@@ -124,45 +124,45 @@ export async function GET(request: NextRequest) {
             continue;
           }
 
-          if (existingReport?.status === "GENERATED" && existingReport.pdfUrl) {
-            reportId = existingReport.id;
-            pdfUrl = existingReport.pdfUrl;
-          } else {
-            const report = await prisma.monthlyReport.upsert({
-              where: { clientId_reportMonth: { clientId: client.id, reportMonth } },
-              create: {
-                agencyId: agency.id,
-                clientId: client.id,
-                reportMonth,
-                periodStart: new Date(current.startDate),
-                periodEnd: new Date(current.endDate),
-                comparisonStart: new Date(previous.startDate),
-                comparisonEnd: new Date(previous.endDate),
-                status: "DRAFT",
-              },
-              update: { status: "DRAFT", errorMessage: null, pdfUrl: null },
-            });
-            reportId = report.id;
+          // Always (re)generate a fresh report with the latest data — ignore any
+          // existing DRAFT/GENERATED report (e.g. one created manually earlier).
+          const report = await prisma.monthlyReport.upsert({
+            where: { clientId_reportMonth: { clientId: client.id, reportMonth } },
+            create: {
+              agencyId: agency.id,
+              clientId: client.id,
+              reportMonth,
+              periodStart: new Date(current.startDate),
+              periodEnd: new Date(current.endDate),
+              comparisonStart: new Date(previous.startDate),
+              comparisonEnd: new Date(previous.endDate),
+              status: "DRAFT",
+            },
+            update: { status: "DRAFT", errorMessage: null, pdfUrl: null },
+          });
+          reportId = report.id;
 
-            const data = await buildReportData(agency.id, client.id, reportMonth);
-            const cfg = parseReportConfig(client.reportConfig);
-            const html = generateReportHtml(data, agencyName, agencyEmail, logoDataUrl, cfg);
-            const filename = buildReportFilename(client.id, reportMonth);
-            pdfUrl = await generatePdf(html, agency.id, filename);
+          // Remove any stale PDF from a previous (manual) generation before rebuilding.
+          if (existingReport?.pdfUrl) await deleteReportFile(existingReport.pdfUrl);
 
-            await prisma.monthlyReport.update({
-              where: { id: reportId },
-              data: {
-                status: "GENERATED",
-                pdfUrl,
-                generatedAt: new Date(),
-                gscClicks: data.gsc.clicks.current,
-                gscImpressions: data.gsc.impressions.current,
-                gscPosition: data.gsc.position.current,
-                gscCtr: data.gsc.ctr.current,
-              },
-            });
-          }
+          const data = await buildReportData(agency.id, client.id, reportMonth);
+          const cfg = parseReportConfig(client.reportConfig);
+          const html = generateReportHtml(data, agencyName, agencyEmail, logoDataUrl, cfg);
+          const filename = buildReportFilename(client.id, reportMonth);
+          pdfUrl = await generatePdf(html, agency.id, filename);
+
+          await prisma.monthlyReport.update({
+            where: { id: reportId },
+            data: {
+              status: "GENERATED",
+              pdfUrl,
+              generatedAt: new Date(),
+              gscClicks: data.gsc.clicks.current,
+              gscImpressions: data.gsc.impressions.current,
+              gscPosition: data.gsc.position.current,
+              gscCtr: data.gsc.ctr.current,
+            },
+          });
 
           const monthName = getMonthName(reportMonth);
           const subject = `דוח SEO חודשי – ${client.name} – ${monthName}`;
