@@ -49,6 +49,33 @@ function applyTemplateVars(template: string, vars: Record<string, string>): stri
   return template.replace(/\{(\w+)\}/g, (_, key) => vars[key] ?? `{${key}}`);
 }
 
+type LogoAttachment = { filename: string; content: Buffer; contentType: string; cid: string };
+
+// Resolve the agency logo for an HTML email. Logos are stored as base64 data
+// URLs, which Gmail (and others) refuse to render as an <img src>. So a data
+// URL is embedded as an inline CID attachment and the <img> points at "cid:…".
+// An already-absolute http(s) URL is used as-is; a relative path is made
+// absolute against the app base URL.
+function resolveEmailLogo(logoUrl: string, baseUrl: string): { src: string; attachment?: LogoAttachment } {
+  if (!logoUrl) return { src: "" };
+  const dataUrl = /^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/.exec(logoUrl);
+  if (dataUrl) {
+    const [, mime, b64] = dataUrl;
+    const ext = (mime.split("/")[1] ?? "png").split("+")[0];
+    return {
+      src: "cid:agencylogo",
+      attachment: {
+        filename: `logo.${ext}`,
+        content: Buffer.from(b64, "base64"),
+        contentType: mime,
+        cid: "agencylogo",
+      },
+    };
+  }
+  if (logoUrl.startsWith("http")) return { src: logoUrl };
+  return { src: `${baseUrl}${logoUrl}` };
+}
+
 export async function sendReportEmail(params: SendReportEmailParams): Promise<string> {
   const { agencyId, to, cc = [], clientName, monthName, pdfUrl } = params;
   const s = await getAgencySettings(agencyId);
@@ -70,11 +97,11 @@ export async function sendReportEmail(params: SendReportEmailParams): Promise<st
 
   const plainText = buildEmailBody(clientName, monthName, agencyName, s.emailIntroText);
 
-  // logoUrl must be absolute for email clients — resolve against NEXTAUTH_URL / APP_URL
+  // Resolve the logo for email: base64 data URLs become an inline CID attachment
+  // (Gmail blocks data: <img> srcs); http/relative URLs are made absolute.
   const baseUrl = (process.env.NEXTAUTH_URL || process.env.APP_URL || "").replace(/\/$/, "");
-  const logoUrl = s.logoUrl
-    ? (s.logoUrl.startsWith("http") ? s.logoUrl : `${baseUrl}${s.logoUrl}`)
-    : "";
+  const logo = resolveEmailLogo(s.logoUrl, baseUrl);
+  const logoUrl = logo.src;
 
   // {introText} = only the intro paragraph, never the full plain-text body (avoids duplication)
   const introForHtml = s.emailIntroText?.trim() ||
@@ -107,6 +134,7 @@ export async function sendReportEmail(params: SendReportEmailParams): Promise<st
         content: pdfBuffer,
         contentType: "application/pdf",
       },
+      ...(logo.attachment ? [logo.attachment] : []),
     ],
   });
 
