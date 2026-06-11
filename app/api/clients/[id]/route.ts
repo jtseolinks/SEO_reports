@@ -26,7 +26,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
     await requireClientInAgency(id, ctx.agencyId);
 
     const body = await request.json();
-    const { name, domain, contactEmail, ccEmails, reportSendDay, sendDayCustom, status, notes,
+    const { name, domain, contactEmail, ccEmails, reportSendDay, reportSendHour, sendDayCustom, status, notes,
             reportLanguage, autoSend, brandNameHe, brandNameEn, excludeFromReports } = body;
 
     const client = await prisma.client.update({
@@ -38,7 +38,8 @@ export async function PUT(request: NextRequest, { params }: Params) {
         ...(ccEmails       !== undefined && { ccEmails }),
         // When reportSendDay is explicitly set, mark as custom unless caller says otherwise
         ...(reportSendDay  !== undefined && { reportSendDay }),
-        ...(reportSendDay  !== undefined && sendDayCustom === undefined && { sendDayCustom: true }),
+        ...(reportSendHour !== undefined && { reportSendHour: Math.min(23, Math.max(0, parseInt(String(reportSendHour)) || 0)) }),
+        ...((reportSendDay !== undefined || reportSendHour !== undefined) && sendDayCustom === undefined && { sendDayCustom: true }),
         ...(sendDayCustom  !== undefined && { sendDayCustom }),
         ...(status         !== undefined && { status }),
         ...(notes          !== undefined && { notes }),

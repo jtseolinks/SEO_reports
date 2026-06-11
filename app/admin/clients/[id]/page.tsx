@@ -37,6 +37,7 @@ export default async function ClientDetailRoute({ params }: Props) {
         contactEmail: client.contactEmail,
         ccEmails: client.ccEmails,
         reportSendDay: client.reportSendDay,
+        reportSendHour: client.reportSendHour,
         status: client.status,
         notes: client.notes,
         industry: client.industry ?? "",

@@ -166,6 +166,7 @@ model Client {
   contactEmail   String
   ccEmails       String[]     @default([])
   reportSendDay  Int          @default(5)
+  reportSendHour Int          @default(9)   // hour of day (0-23, Asia/Jerusalem) for auto-send
   status         ClientStatus @default(ACTIVE)
   notes          String?
   industry       String?

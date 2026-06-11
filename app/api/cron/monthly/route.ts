@@ -25,6 +25,17 @@ function getPreviousMonth(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
+// Current day-of-month and hour in Israel time — auto-send schedules are local.
+function nowInIsrael(): { day: number; hour: number } {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Jerusalem", day: "2-digit", hour: "2-digit", hour12: false,
+  }).formatToParts(new Date());
+  const day = parseInt(parts.find((p) => p.type === "day")?.value ?? "0", 10);
+  let hour = parseInt(parts.find((p) => p.type === "hour")?.value ?? "0", 10);
+  if (hour === 24) hour = 0; // some runtimes emit "24" for midnight
+  return { day, hour };
+}
+
 async function resolveLogoDataUrl(logoUrl: string): Promise<string> {
   if (!logoUrl) return "";
   try {
@@ -49,7 +60,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const today = new Date().getDate(); // day of month (1-31)
+  const { day: today, hour: nowHour } = nowInIsrael(); // Israel-local day + hour
   const reportMonth = getPreviousMonth();
   const { current, previous } = getReportPeriods(reportMonth);
 
@@ -67,12 +78,14 @@ export async function GET(request: NextRequest) {
       const agencyEmail = settings.contactEmail || process.env.AGENCY_EMAIL || "";
       const logoDataUrl = await resolveLogoDataUrl(settings.logoUrl);
 
-      // Active clients in THIS agency whose send day is today (and not opted out).
+      // Active clients in THIS agency whose send day AND hour match now (Israel
+      // local) and that are not opted out. The cron runs hourly.
       const clients = await prisma.client.findMany({
         where: {
           agencyId: agency.id,
           status: "ACTIVE",
           reportSendDay: today,
+          reportSendHour: nowHour,
           excludeFromReports: false,
           autoSend: true,
         },
@@ -98,6 +111,18 @@ export async function GET(request: NextRequest) {
           const existingReport = await prisma.monthlyReport.findUnique({
             where: { clientId_reportMonth: { clientId: client.id, reportMonth } },
           });
+
+          // Already delivered this month — never resend (guards hourly re-runs).
+          if (existingReport?.status === "SENT") {
+            results.push({
+              agencyId: agency.id,
+              clientId: client.id,
+              clientName: client.name,
+              status: "skipped",
+              reason: "Already sent this month",
+            });
+            continue;
+          }
 
           if (existingReport?.status === "GENERATED" && existingReport.pdfUrl) {
             reportId = existingReport.id;
@@ -221,6 +246,7 @@ export async function GET(request: NextRequest) {
     date: new Date().toISOString(),
     reportMonth,
     sendDay: today,
+    sendHour: nowHour,
     agencies: agencies.length,
     totalClients: results.length,
     sent: results.filter((r) => r.status === "sent").length,

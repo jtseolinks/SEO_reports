@@ -15,7 +15,7 @@ import { type ReportConfig, DEFAULT_REPORT_CONFIG, REPORT_SECTIONS, parseReportC
 
 type Client = {
   id: string; name: string; domain: string; contactEmail: string;
-  ccEmails: string[]; reportSendDay: number; status: string; notes: string | null;
+  ccEmails: string[]; reportSendDay: number; reportSendHour: number; status: string; notes: string | null;
   industry: string; reportLanguage: string; autoSend: boolean; createdAt: string;
   brandNameHe: string; brandNameEn: string;
   excludeFromReports: boolean;
@@ -297,6 +297,7 @@ export function ClientDetailPage({
   const [brandNameEn, setBrandNameEn] = useState(initialClient.brandNameEn);
   const [excludeFromReports, setExcludeFromReports] = useState(initialClient.excludeFromReports);
   const [reportSendDay, setReportSendDay] = useState(initialClient.reportSendDay);
+  const [reportSendHour, setReportSendHour] = useState(initialClient.reportSendHour);
   const [sendDayCustom, setSendDayCustom] = useState(initialClient.sendDayCustom);
 
   // Active period — set by GscLivePanel, used for report generation
@@ -334,12 +335,12 @@ export function ClientDetailPage({
           reportLanguage, autoSend,
           contactEmail: contact ?? client.contactEmail,
           ccEmails: cc,
-          reportSendDay, sendDayCustom,
+          reportSendDay, reportSendHour, sendDayCustom,
           brandNameHe, brandNameEn, excludeFromReports,
         }),
       });
       if (res.ok) {
-        setClient(c => ({ ...c, reportLanguage, autoSend, contactEmail: contact, ccEmails: cc, reportSendDay, sendDayCustom, brandNameHe, brandNameEn, excludeFromReports }));
+        setClient(c => ({ ...c, reportLanguage, autoSend, contactEmail: contact, ccEmails: cc, reportSendDay, reportSendHour, sendDayCustom, brandNameHe, brandNameEn, excludeFromReports }));
         // Merge auto-brand terms into the local brandKeywords state
         setBrandKeywords(prev => {
           const autoTerms = [brandNameHe, brandNameEn].filter(Boolean) as string[];
@@ -849,7 +850,7 @@ export function ClientDetailPage({
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 500, color: "var(--text)" }}>שליחה אוטומטית</div>
                   <div style={{ fontSize: 11, color: "var(--text-faint)" }}>
-                    {autoSend ? `יום ${reportSendDay} לכל חודש, 09:00` : "כבוי"}
+                    {autoSend ? `יום ${reportSendDay} לכל חודש, ${String(reportSendHour).padStart(2, "0")}:00` : "כבוי"}
                   </div>
                 </div>
                 <Toggle value={autoSend} onChange={setAutoSend} disabled={excludeFromReports} />
@@ -882,7 +883,7 @@ export function ClientDetailPage({
                     </button>
                   )}
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                   <input
                     type="number"
                     min={1} max={28}
@@ -894,7 +895,17 @@ export function ClientDetailPage({
                     }}
                     style={{ width: 64, height: 32, paddingInline: "10px", border: "1px solid var(--border)", borderRadius: "var(--r-sm)", background: "var(--surface)", fontSize: 13, fontFamily: "inherit", color: "var(--text)", outline: "none", textAlign: "center" }}
                   />
-                  <span style={{ fontSize: 12, color: "var(--text-faint)" }}>לכל חודש (1–28)</span>
+                  <span style={{ fontSize: 12, color: "var(--text-faint)" }}>לכל חודש בשעה</span>
+                  <select
+                    value={reportSendHour}
+                    onChange={e => { setReportSendHour(parseInt(e.target.value)); setSendDayCustom(true); }}
+                    style={{ height: 32, paddingInline: "10px", border: "1px solid var(--border)", borderRadius: "var(--r-sm)", background: "var(--surface)", fontSize: 13, fontFamily: "inherit", color: "var(--text)", outline: "none", cursor: "pointer" }}
+                  >
+                    {Array.from({ length: 24 }, (_, h) => (
+                      <option key={h} value={h}>{String(h).padStart(2, "0")}:00</option>
+                    ))}
+                  </select>
+                  <span style={{ fontSize: 11, color: "var(--text-faint)" }}>(שעון ישראל)</span>
                 </div>
               </div>
 
