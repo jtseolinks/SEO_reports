@@ -1,23 +1,14 @@
 import { prisma } from "./prisma";
-import { encrypt, decrypt } from "./crypto";
 
-// Keys whose values are secrets — encrypted at rest and never returned raw to
-// the client (the API route masks them).
-const SECRET_KEYS: (keyof AgencySettings)[] = ["smtpPass"];
+// Agency settings hold no secrets anymore (SMTP credentials moved to the
+// platform-level config, see lib/platform-settings.ts). SECRET_KEYS is kept as
+// an empty list so the mask/whitelist plumbing stays in place if a secret is
+// reintroduced later.
+const SECRET_KEYS: (keyof AgencySettings)[] = [];
 
-// Placeholder the API returns instead of the real secret. If a save request
-// sends this value back unchanged, the existing secret is preserved.
+// Placeholder the API returns instead of a secret value (unused while there are
+// no secret keys, but kept stable for the client contract).
 export const SECRET_MASK = "********";
-
-function safeDecrypt(value: string): string {
-  if (!value) return "";
-  try {
-    return decrypt(value);
-  } catch {
-    // Legacy plaintext value stored before encryption was introduced.
-    return value;
-  }
-}
 
 export type AgencySettings = {
   // ── Agency details ──────────────────────────────────────────────────────────
@@ -33,13 +24,8 @@ export type AgencySettings = {
   reportAccentColor:  string;   // hex, default "#1E6FBF"
   reportFooterText:   string;   // custom footer line in PDF
 
-  // ── SMTP configuration ──────────────────────────────────────────────────────
-  smtpHost: string;  // e.g. smtp-relay.brevo.com
-  smtpPort: string;  // 587
-  smtpUser: string;
-  smtpPass: string;
-
   // ── Email & sending ─────────────────────────────────────────────────────────
+  // (SMTP transport credentials are platform-level — see lib/platform-settings.ts)
   emailSenderName:      string; // "From" name
   emailSenderEmail:     string; // "From" / reply-to address
   emailSubjectTemplate: string; // e.g. "דוח SEO חודשי – {client} – {month}"
@@ -57,7 +43,6 @@ export type AgencySettings = {
 const KEYS: (keyof AgencySettings)[] = [
   "agencyName", "agencyUrl", "contactName", "contactEmail", "description", "logoUrl",
   "reportPrimaryColor", "reportAccentColor", "reportFooterText",
-  "smtpHost", "smtpPort", "smtpUser", "smtpPass",
   "emailSenderName", "emailSenderEmail", "emailSubjectTemplate", "emailIntroText",
   "agencyBccEmail", "agencyBccEnabled", "emailHtmlTemplate",
   "defaultSendDay", "defaultLanguage", "defaultAutoSend",
@@ -76,11 +61,6 @@ function defaults(): AgencySettings {
     reportAccentColor:  "#1E6FBF",
     reportFooterText:   "",
 
-    smtpHost: process.env.SMTP_HOST ?? "",
-    smtpPort: process.env.SMTP_PORT ?? "587",
-    smtpUser: process.env.SMTP_USER ?? "",
-    smtpPass: process.env.SMTP_PASS ?? "",
-
     emailSenderName:      process.env.AGENCY_NAME  ?? "",
     emailSenderEmail:     process.env.AGENCY_EMAIL ?? "",
     emailSubjectTemplate: "דוח SEO חודשי – {client} – {month}",
@@ -95,19 +75,15 @@ function defaults(): AgencySettings {
   };
 }
 
-// Returns settings with secrets DECRYPTED (real values), for internal/server use
-// such as sending email. Never return this object directly to the client — use
-// maskSecrets() for that.
+// Returns the agency settings (no secrets at this level), for server use such as
+// resolving the email sender identity.
 export async function getAgencySettings(agencyId: string): Promise<AgencySettings> {
   const rows = await prisma.agencySetting.findMany({ where: { agencyId, key: { in: KEYS } } });
   const map  = Object.fromEntries(rows.map(r => [r.key, r.value]));
   const d    = defaults();
   return KEYS.reduce((acc, k) => {
     const stored = map[k];
-    const value = SECRET_KEYS.includes(k)
-      ? (stored !== undefined ? safeDecrypt(stored) : d[k])
-      : (stored ?? d[k]);
-    return { ...acc, [k]: value };
+    return { ...acc, [k]: stored ?? d[k] };
   }, {} as AgencySettings);
 }
 
@@ -130,16 +106,12 @@ export async function saveAgencySettings(
       .filter(([key]) => (KEYS as string[]).includes(key))
       // Ignore a secret that comes back as the unchanged mask.
       .filter(([key, value]) => !(SECRET_KEYS.includes(key as keyof AgencySettings) && value === SECRET_MASK))
-      .map(([key, value]) => {
-        const raw = value ?? "";
-        const stored = SECRET_KEYS.includes(key as keyof AgencySettings) && raw
-          ? encrypt(raw)
-          : raw;
-        return prisma.agencySetting.upsert({
+      .map(([key, value]) =>
+        prisma.agencySetting.upsert({
           where:  { agencyId_key: { agencyId, key } },
-          create: { agencyId, key, value: stored },
-          update: { value: stored },
-        });
-      })
+          create: { agencyId, key, value: value ?? "" },
+          update: { value: value ?? "" },
+        })
+      )
   );
 }

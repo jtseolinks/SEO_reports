@@ -1,16 +1,22 @@
 import nodemailer from "nodemailer";
 import fs from "fs/promises";
 import { getAgencySettings } from "./agency-settings";
+import { getPlatformSettings } from "./platform-settings";
 import { reportFilePathFromUrl } from "./report-storage";
 
-async function createTransport(agencyId: string) {
-  const s = await getAgencySettings(agencyId);
-  const host = s.smtpHost || process.env.SMTP_HOST;
-  const port = parseInt(s.smtpPort || process.env.SMTP_PORT || "587");
-  const user = s.smtpUser || process.env.SMTP_USER;
-  const pass = s.smtpPass || process.env.SMTP_PASS;
+// Single shared SMTP transport for ALL outgoing mail. Credentials live in the
+// platform settings (super-admin managed), never per-agency. Sender identity
+// (from name/address) is still resolved per-agency by the callers below.
+async function createTransport() {
+  const s = await getPlatformSettings();
+  const host = s.smtpHost;
+  const port = parseInt(s.smtpPort || "587");
+  const user = s.smtpUser;
+  const pass = s.smtpPass;
 
-  if (!host || !user || !pass) throw new Error("SMTP לא מוגדר — הכנס פרטי שרת בהגדרות האימייל");
+  if (!host || !user || !pass) {
+    throw new Error("SMTP לא מוגדר — פנה למנהל המערכת (Super Admin) להגדרת שרת הדואר במסך הגדרות מייל");
+  }
 
   return nodemailer.createTransport({
     host,
@@ -85,7 +91,7 @@ export async function sendReportEmail(params: SendReportEmailParams): Promise<st
     });
   }
 
-  const transporter = await createTransport(agencyId);
+  const transporter = await createTransport();
 
   const info = await transporter.sendMail({
     from: `${fromName} <${fromEmail}>`,
@@ -112,7 +118,7 @@ export async function sendTestEmail(agencyId: string, to: string): Promise<strin
   const agencyName = s.agencyName || process.env.AGENCY_NAME || "SEO Agency";
   const fromName   = s.emailSenderName  || agencyName;
   const fromEmail  = s.emailSenderEmail || process.env.SMTP_FROM || "noreply@example.com";
-  const transporter = await createTransport(agencyId);
+  const transporter = await createTransport();
 
   const info = await transporter.sendMail({
     from: `${fromName} <${fromEmail}>`,
@@ -134,7 +140,7 @@ export async function sendInvitationEmail(
   const agencyName = s.agencyName || process.env.AGENCY_NAME || "SEO Agency";
   const fromName   = s.emailSenderName  || agencyName;
   const fromEmail  = s.emailSenderEmail || process.env.SMTP_FROM || "noreply@example.com";
-  const transporter = await createTransport(agencyId);
+  const transporter = await createTransport();
 
   const html = `<!DOCTYPE html>
 <html dir="rtl" lang="he">
@@ -189,54 +195,26 @@ export async function sendInvitationEmail(
   return info.messageId ?? "";
 }
 
-/** Resolve platform-level SMTP transporter.
- *  Priority: SMTP_* env vars → any agency with SMTP in DB. */
+/** Resolve the platform-level SMTP transporter from the single platform config
+ *  (super-admin managed). Used for onboarding / invite / reset / test mail. */
 async function getPlatformTransport(): Promise<{
   transporter: ReturnType<typeof nodemailer.createTransport>;
   fromEmail: string;
   fromName: string;
 }> {
-  let host      = process.env.SMTP_HOST;
-  let portStr   = process.env.SMTP_PORT;
-  let user      = process.env.SMTP_USER;
-  let pass      = process.env.SMTP_PASS;
-  let fromEmail = process.env.SMTP_FROM;
-  const fromName = process.env.SMTP_FROM_NAME || process.env.AGENCY_NAME || "Rankey SEO Reports";
+  const s = await getPlatformSettings();
 
-  if (!host || !user || !pass) {
-    const { prisma: db } = await import("./prisma");
-    const smtpSettings = await db.agencySetting.findMany({
-      where: { key: { in: ["smtpHost", "smtpUser", "smtpPass"] } },
-      orderBy: { updatedAt: "desc" },
-    });
-    const byAgency: Record<string, Record<string, string>> = {};
-    for (const s of smtpSettings) {
-      if (!byAgency[s.agencyId]) byAgency[s.agencyId] = {};
-      byAgency[s.agencyId][s.key] = s.value;
-    }
-    for (const [agencyId, cfg] of Object.entries(byAgency)) {
-      if (cfg["smtpHost"] && cfg["smtpUser"] && cfg["smtpPass"]) {
-        // Load via getAgencySettings so smtpPass is DECRYPTED (raw DB value is encrypted).
-        const settings = await getAgencySettings(agencyId);
-        host      = host      || settings.smtpHost;
-        portStr   = portStr   || settings.smtpPort;
-        user      = user      || settings.smtpUser;
-        pass      = pass      || settings.smtpPass;
-        fromEmail = fromEmail || settings.emailSenderEmail;
-        break;
-      }
-    }
+  if (!s.smtpHost || !s.smtpUser || !s.smtpPass) {
+    throw new Error("SMTP לא מוגדר — הגדר שרת דואר במסך Super Admin → הגדרות מייל");
   }
 
-  if (!host || !user || !pass) {
-    throw new Error("SMTP לא מוגדר — הגדר SMTP_HOST / SMTP_USER / SMTP_PASS ב-.env.local או בהגדרות הסוכנות");
-  }
-
-  const port = parseInt(portStr || "587");
+  const port = parseInt(s.smtpPort || "587");
   const transporter = nodemailer.createTransport({
-    host, port, secure: port === 465, auth: { user, pass },
+    host: s.smtpHost, port, secure: port === 465, auth: { user: s.smtpUser, pass: s.smtpPass },
   });
-  return { transporter, fromEmail: fromEmail || user, fromName };
+  const fromName  = s.smtpFromName  || process.env.AGENCY_NAME || "Rankey SEO Reports";
+  const fromEmail = s.smtpFromEmail || s.smtpUser;
+  return { transporter, fromEmail, fromName };
 }
 
 /** Invite email for a new team member — simple password-setup link. */
@@ -437,6 +415,18 @@ export async function sendPasswordResetEmail(
     subject: "איפוס סיסמא – Rankey SEO Reports",
     text: `שלום,\n\nהתקבלה בקשה לאיפוס הסיסמא שלך.\n\nלהגדרת סיסמא חדשה:\n${resetUrl}\n\nהקישור תקף ל-7 ימים.\n\nצוות Rankey`,
     html,
+  });
+  return info.messageId ?? "";
+}
+
+/** Send a test email through the platform SMTP transport (super-admin only). */
+export async function sendPlatformTestEmail(to: string): Promise<string> {
+  const { transporter, fromEmail, fromName } = await getPlatformTransport();
+  const info = await transporter.sendMail({
+    from: `${fromName} <${fromEmail}>`,
+    to,
+    subject: "[Test] Rankey SEO Reports – בדיקת הגדרות SMTP",
+    text: "מייל בדיקה ממערכת Rankey SEO Reports.\n\nאם קיבלת אותו — הגדרות שרת הדואר (SMTP) של הפלטפורמה תקינות.",
   });
   return info.messageId ?? "";
 }

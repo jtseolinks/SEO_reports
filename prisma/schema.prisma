@@ -347,6 +347,16 @@ model AgencySetting {
   @@id([agencyId, key])
 }
 
+// Platform-wide settings (single source of truth, not tenant-scoped). Holds the
+// shared SMTP transport (host/port/user/pass + sender identity) used for ALL
+// outgoing mail. Managed only by super-admins. Secrets (smtpPass) are encrypted
+// at rest with the same scheme as AgencySetting.
+model PlatformSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
 model SyncJob {
   id           String        @id @default(cuid())
   agencyId     String

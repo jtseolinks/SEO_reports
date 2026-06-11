@@ -7,7 +7,7 @@ import {
   Building2, Users, FileText, Globe, Plus, Pencil, Trash2,
   X, Check, Loader2, AlertCircle, CheckCircle2, ChevronDown,
   ChevronRight, ShieldCheck, Shield, UserPlus, RefreshCw, Wifi, WifiOff,
-  LogIn,
+  LogIn, Mail, Send, Server,
 } from "lucide-react";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -37,6 +37,11 @@ type PlatformUser = {
 };
 
 type Stats = { agencyCount: number; userCount: number; clientCount: number; reportCount: number };
+
+type SmtpForm = {
+  smtpHost: string; smtpPort: string; smtpUser: string;
+  smtpPass: string; smtpFromEmail: string; smtpFromName: string;
+};
 
 const ROLE_LABELS: Record<string, string> = { OWNER: "בעלים", ADMIN: "מנהל", MEMBER: "חבר צוות" };
 
@@ -885,13 +890,184 @@ function UsersTab() {
   );
 }
 
+// ── SMTP Tab ──────────────────────────────────────────────────────────────────
+
+function SmtpTab() {
+  const [form, setForm]       = useState<SmtpForm | null>(null);
+  const [saving, setSaving]   = useState(false);
+  const [saveResult, setSaveResult] = useState<"ok" | "err" | null>(null);
+  const [testTo, setTestTo]   = useState("");
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ ok: boolean; msg: string } | null>(null);
+
+  useEffect(() => {
+    fetch("/api/super-admin/smtp")
+      .then(r => r.json())
+      .then(d => setForm({
+        smtpHost:      d.smtpHost      ?? "",
+        smtpPort:      d.smtpPort      ?? "587",
+        smtpUser:      d.smtpUser      ?? "",
+        smtpPass:      d.smtpPass      ?? "",
+        smtpFromEmail: d.smtpFromEmail ?? "",
+        smtpFromName:  d.smtpFromName  ?? "",
+      }))
+      .catch(() => setForm({ smtpHost:"", smtpPort:"587", smtpUser:"", smtpPass:"", smtpFromEmail:"", smtpFromName:"" }));
+  }, []);
+
+  function upd(k: keyof SmtpForm, v: string) {
+    setForm(f => (f ? { ...f, [k]: v } : f));
+    setSaveResult(null);
+  }
+
+  async function save() {
+    if (!form) return;
+    setSaving(true); setSaveResult(null);
+    try {
+      const res = await fetch("/api/super-admin/smtp", {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+      setSaveResult(res.ok ? "ok" : "err");
+    } catch {
+      setSaveResult("err");
+    } finally { setSaving(false); }
+  }
+
+  async function test() {
+    if (!testTo) return;
+    setTesting(true); setTestResult(null);
+    try {
+      const res = await fetch("/api/super-admin/smtp/test", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to: testTo }),
+      });
+      const d = await res.json();
+      setTestResult(res.ok ? { ok: true, msg: "מייל נשלח בהצלחה!" } : { ok: false, msg: d.error ?? "שגיאה בשליחה" });
+    } catch {
+      setTestResult({ ok: false, msg: "שגיאת רשת" });
+    } finally { setTesting(false); }
+  }
+
+  if (!form) return (
+    <div style={{ display:"flex", justifyContent:"center", padding:40 }}>
+      <Loader2 size={22} className="animate-spin" style={{ color:"var(--text-faint)" }}/>
+    </div>
+  );
+
+  const cardStyle: React.CSSProperties = {
+    background:"var(--surface)", border:"1px solid var(--border)",
+    borderRadius:"var(--r-lg)", padding:"20px 22px", maxWidth:640,
+  };
+  const labelStyle: React.CSSProperties = {
+    display:"block", fontSize:12, fontWeight:600, color:"var(--text-muted)", marginBottom:5,
+  };
+  const inputStyle: React.CSSProperties = {
+    width:"100%", fontSize:13, padding:"8px 12px", border:"1px solid var(--border)",
+    borderRadius:"var(--r-md)", background:"var(--surface-sunken)", outline:"none", boxSizing:"border-box",
+  };
+
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+      {/* SMTP server config */}
+      <div style={cardStyle}>
+        <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:4 }}>
+          <Server size={16} style={{ color:"var(--accent)" }}/>
+          <h2 style={{ fontSize:15, fontWeight:700, margin:0 }}>הגדרות שרת דואר (SMTP)</h2>
+        </div>
+        <p style={{ fontSize:12.5, color:"var(--text-muted)", margin:"0 0 18px", lineHeight:1.6 }}>
+          שרת דואר יחיד לכל המערכת — משמש לשליחת דוחות, הזמנות והגדרת סוכנויות. מומלץ: <strong>Brevo</strong> (300 מיילים/יום חינם).
+        </p>
+
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 110px", gap:12, marginBottom:14 }}>
+          <div>
+            <label style={labelStyle}>שרת SMTP (Host)</label>
+            <input style={inputStyle} dir="ltr" value={form.smtpHost}
+              onChange={e => upd("smtpHost", e.target.value)} placeholder="smtp-relay.brevo.com"/>
+          </div>
+          <div>
+            <label style={labelStyle}>פורט</label>
+            <input style={inputStyle} dir="ltr" value={form.smtpPort}
+              onChange={e => upd("smtpPort", e.target.value)} placeholder="587"/>
+          </div>
+        </div>
+
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:14 }}>
+          <div>
+            <label style={labelStyle}>שם משתמש</label>
+            <input style={inputStyle} dir="ltr" value={form.smtpUser}
+              onChange={e => upd("smtpUser", e.target.value)} placeholder="your@email.com"/>
+          </div>
+          <div>
+            <label style={labelStyle}>סיסמה / SMTP Key</label>
+            <input style={inputStyle} dir="ltr" type="password" value={form.smtpPass}
+              onChange={e => upd("smtpPass", e.target.value)} placeholder="••••••••"/>
+          </div>
+        </div>
+
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:16 }}>
+          <div>
+            <label style={labelStyle}>שם השולח (From)</label>
+            <input style={inputStyle} value={form.smtpFromName}
+              onChange={e => upd("smtpFromName", e.target.value)} placeholder="Rankey SEO Reports"/>
+          </div>
+          <div>
+            <label style={labelStyle}>כתובת השולח (From)</label>
+            <input style={inputStyle} dir="ltr" value={form.smtpFromEmail}
+              onChange={e => upd("smtpFromEmail", e.target.value)} placeholder="reports@rankey.co.il"/>
+          </div>
+        </div>
+
+        <div style={{ background:"var(--surface-sunken)", borderRadius:"var(--r-md)", padding:"10px 14px",
+          fontSize:12, color:"var(--text-muted)", lineHeight:1.6, marginBottom:16 }}>
+          <strong>Brevo (חינמי):</strong> smtp-relay.brevo.com · פורט 587 · שם משתמש = האימייל שלך ב-Brevo · סיסמה = SMTP key מ-<span dir="ltr">Settings → SMTP &amp; API</span>
+        </div>
+
+        <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+          <button onClick={save} disabled={saving} className="btn btn-primary"
+            style={{ display:"inline-flex", alignItems:"center", gap:6 }}>
+            {saving ? <Loader2 size={13} className="animate-spin"/> : <Check size={13}/>} שמור הגדרות
+          </button>
+          {saveResult === "ok"  && <span style={{ fontSize:13, color:"var(--green,#16a34a)", display:"inline-flex", alignItems:"center", gap:5 }}><CheckCircle2 size={14}/> נשמר</span>}
+          {saveResult === "err" && <span style={{ fontSize:13, color:"var(--red,#dc2626)", display:"inline-flex", alignItems:"center", gap:5 }}><AlertCircle size={14}/> שגיאה בשמירה</span>}
+        </div>
+      </div>
+
+      {/* Test send */}
+      <div style={cardStyle}>
+        <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:14 }}>
+          <Mail size={16} style={{ color:"var(--accent)" }}/>
+          <h2 style={{ fontSize:15, fontWeight:700, margin:0 }}>בדיקת שליחה</h2>
+        </div>
+        <div style={{ display:"flex", gap:8, alignItems:"flex-end" }}>
+          <div style={{ flex:1 }}>
+            <label style={labelStyle}>שלח מייל ניסיון אל</label>
+            <input style={inputStyle} dir="ltr" type="email" value={testTo}
+              onChange={e => setTestTo(e.target.value)} placeholder="your@email.com"
+              onKeyDown={e => { if (e.key === "Enter") test(); }}/>
+          </div>
+          <button onClick={test} disabled={testing || !testTo} className="btn btn-secondary"
+            style={{ display:"inline-flex", alignItems:"center", gap:6, whiteSpace:"nowrap" }}>
+            {testing ? <Loader2 size={13} className="animate-spin"/> : <Send size={13}/>} שלח בדיקה
+          </button>
+        </div>
+        {testResult && (
+          <div style={{ marginTop:12, fontSize:12.5, display:"flex", alignItems:"center", gap:6,
+            color: testResult.ok ? "var(--green,#16a34a)" : "var(--red,#dc2626)" }}>
+            {testResult.ok ? <CheckCircle2 size={14}/> : <AlertCircle size={14}/>} {testResult.msg}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export function SuperAdminClient({ initialStats }: { initialStats: Stats }) {
   const router = useRouter();
   const { update: updateSession } = useSession();
 
-  const [activeTab, setActiveTab]     = useState<"agencies" | "users">("agencies");
+  const [activeTab, setActiveTab]     = useState<"agencies" | "users" | "smtp">("agencies");
   const [agencies, setAgencies]       = useState<Agency[]>([]);
   const [stats, setStats]             = useState<Stats>(initialStats);
   const [loading, setLoading]         = useState(true);
@@ -962,6 +1138,9 @@ export function SuperAdminClient({ initialStats }: { initialStats: Stats }) {
         </button>
         <button onClick={() => setActiveTab("users")} style={TAB_STYLE(activeTab==="users")}>
           משתמשים
+        </button>
+        <button onClick={() => setActiveTab("smtp")} style={TAB_STYLE(activeTab==="smtp")}>
+          הגדרות מייל
         </button>
       </div>
 
@@ -1121,6 +1300,8 @@ export function SuperAdminClient({ initialStats }: { initialStats: Stats }) {
       )}
 
       {activeTab === "users" && <UsersTab/>}
+
+      {activeTab === "smtp" && <SmtpTab/>}
 
       {/* Modals */}
       {showCreate && (

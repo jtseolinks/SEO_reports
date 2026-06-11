@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireSuperAdmin, toResponse } from "@/lib/authz";
 import { createSetupToken } from "@/lib/setup-token";
 import { sendOnboardingEmail } from "@/lib/email";
+import { isPlatformSmtpConfigured } from "@/lib/platform-settings";
 
 async function uniqueSlug(base: string): Promise<string> {
   const slug =
@@ -30,7 +31,7 @@ async function uniqueSlug(base: string): Promise<string> {
 export async function GET() {
   try {
     await requireSuperAdmin();
-    const [agencies, allSettings] = await Promise.all([
+    const [agencies, allSettings, smtpReady] = await Promise.all([
       prisma.agency.findMany({
         orderBy: { createdAt: "desc" },
         include: {
@@ -44,12 +45,14 @@ export async function GET() {
         },
       }),
       prisma.agencySetting.findMany({
-        where: { key: { in: ["agencyName", "smtpHost"] } },
+        where: { key: { in: ["agencyName"] } },
         select: { agencyId: true, key: true, value: true },
       }),
+      // SMTP is now a single platform-wide config, shared by all agencies.
+      isPlatformSmtpConfigured(),
     ]);
 
-    // Build settings lookup: agencyId → { agencyName?, smtpHost? }
+    // Build settings lookup: agencyId → { agencyName? }
     const settingsMap: Record<string, Record<string, string>> = {};
     for (const s of allSettings) {
       if (!settingsMap[s.agencyId]) settingsMap[s.agencyId] = {};
@@ -67,7 +70,7 @@ export async function GET() {
           !!(settings["agencyName"]?.trim()),                       // 2. agency name configured
           a.googleConnection?.status === "CONNECTED",               // 3. Google connected
           a._count.memberships > 1,                                 // 4. has team (> owner)
-          !!(settings["smtpHost"]?.trim()),                         // 5. SMTP configured
+          smtpReady,                                                // 5. platform SMTP configured
         ];
         const setupPercent = Math.round((checks.filter(Boolean).length / checks.length) * 100);
 

@@ -384,8 +384,6 @@ function EmailSection({ form, dirty, saving, saveResult, updateField, handleSave
   const [testResult, setTestResult] = useState<{ ok: boolean; msg: string } | null>(null);
   const [htmlPreview, setHtmlPreview] = useState(false);
 
-  const smtpConfigured = !!(form.smtpHost && form.smtpUser && form.smtpPass);
-
   function previewHtml(): string {
     const tpl = form.emailHtmlTemplate || DEFAULT_HTML_TEMPLATE;
     return tpl
@@ -416,63 +414,24 @@ function EmailSection({ form, dirty, saving, saveResult, updateField, handleSave
 
   return (
     <>
-      {/* SMTP configuration */}
+      {/* Test send — SMTP server credentials are managed centrally in Super Admin → email settings */}
       <div className="card">
         <div className="card-head">
           <div>
-            <h3 className="card-title">הגדרות SMTP</h3>
-            <p className="card-sub">שרת דואר יוצא לשליחת דוחות. מומלץ: <strong>Brevo</strong> (300 מיילים/יום חינם)</p>
+            <h3 className="card-title">בדיקת שליחת מייל</h3>
+            <p className="card-sub">הגדרות שרת הדואר (SMTP) מנוהלות מרכזית ע״י מנהל המערכת. כאן ניתן לשלוח מייל ניסיון דרך השרת המוגדר.</p>
           </div>
-          <span className={`rk-badge ${smtpConfigured ? "success" : "neutral"}`} style={{ fontSize: 10, alignSelf: "center" }}>
-            <span className="pip" />{smtpConfigured ? "מוגדר" : "לא מוגדר"}
-          </span>
         </div>
-        <div className="card-pad" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 12 }}>
-            <div>
-              <label className="field-label">שרת SMTP (Host)</label>
-              <input className="rk-input" value={form.smtpHost} dir="ltr"
-                onChange={e => updateField("smtpHost", e.target.value)}
-                placeholder="smtp-relay.brevo.com" />
-            </div>
-            <div style={{ minWidth: 90 }}>
-              <label className="field-label">פורט</label>
-              <input className="rk-input" value={form.smtpPort} dir="ltr"
-                onChange={e => updateField("smtpPort", e.target.value)}
-                placeholder="587" />
-            </div>
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <div>
-              <label className="field-label">שם משתמש</label>
-              <input className="rk-input" value={form.smtpUser} dir="ltr"
-                onChange={e => updateField("smtpUser", e.target.value)}
-                placeholder="your@email.com" />
-            </div>
-            <div>
-              <label className="field-label">סיסמה / API Key</label>
-              <input className="rk-input" value={form.smtpPass} dir="ltr" type="password"
-                onChange={e => updateField("smtpPass", e.target.value)}
-                placeholder="••••••••" />
-            </div>
-          </div>
-
-          <div style={{ background: "var(--surface-sunken)", borderRadius: "var(--r-md)", padding: "10px 14px", fontSize: 12, color: "var(--text-muted)", lineHeight: 1.6 }}>
-            <strong>Brevo (חינמי):</strong> smtp-relay.brevo.com · פורט 587 · שם משתמש = האימייל שלך ב-Brevo · סיסמה = SMTP key מ-<span dir="ltr">Settings → SMTP & API</span>
-          </div>
-
-          <SaveRow dirty={dirty} saving={saving} saveResult={saveResult} onSave={handleSave} onReset={resetForm} />
-
-          {/* Test send */}
-          <div style={{ borderTop: "1px solid var(--border)", paddingTop: 14, display: "flex", gap: 8, alignItems: "flex-end" }}>
+        <div className="card-pad">
+          <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
             <div style={{ flex: 1 }}>
-              <label className="field-label">בדוק שליחה — שלח מייל ניסיון</label>
+              <label className="field-label">שלח מייל ניסיון אל</label>
               <input className="rk-input" value={testTo} dir="ltr" type="email"
                 onChange={e => setTestTo(e.target.value)}
                 placeholder="your@email.com"
                 onKeyDown={e => { if (e.key === "Enter") handleTest(); }} />
             </div>
-            <button onClick={handleTest} disabled={testing || !testTo || !smtpConfigured}
+            <button onClick={handleTest} disabled={testing || !testTo}
               className="btn btn-secondary sm"
               style={{ display: "inline-flex", alignItems: "center", gap: 5, whiteSpace: "nowrap" }}>
               {testing ? <Loader2 size={12} className="animate-spin" /> : <Mail size={12} />}
@@ -480,7 +439,7 @@ function EmailSection({ form, dirty, saving, saveResult, updateField, handleSave
             </button>
           </div>
           {testResult && (
-            <div style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 5, color: testResult.ok ? "var(--green)" : "var(--red)" }}>
+            <div style={{ marginTop: 10, fontSize: 12, display: "flex", alignItems: "center", gap: 5, color: testResult.ok ? "var(--green)" : "var(--red)" }}>
               {testResult.ok ? <CheckCircle2 size={13} /> : <AlertCircle size={13} />}
               {testResult.msg}
             </div>
