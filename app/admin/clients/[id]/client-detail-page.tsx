@@ -291,7 +291,6 @@ export function ClientDetailPage({
       setGa4Saving(false);
     }
   }
-  const [ccAgency, setCcAgency] = useState(false);
   const [reportLanguage, setReportLanguage] = useState(initialClient.reportLanguage);
   const [brandNameHe, setBrandNameHe] = useState(initialClient.brandNameHe);
   const [brandNameEn, setBrandNameEn] = useState(initialClient.brandNameEn);
@@ -907,14 +906,6 @@ export function ClientDetailPage({
                   </select>
                   <span style={{ fontSize: 11, color: "var(--text-faint)" }}>(שעון ישראל)</span>
                 </div>
-              </div>
-
-              <div style={settingsRowStyle}>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 500, color: "var(--text)" }}>שלח עותק לסוכנות</div>
-                  <div style={{ fontSize: 11, color: "var(--text-faint)" }}>{client.contactEmail}</div>
-                </div>
-                <Toggle value={ccAgency} onChange={setCcAgency} />
               </div>
             </div>
           </div>
