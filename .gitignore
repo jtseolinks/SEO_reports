@@ -47,3 +47,4 @@ next-env.d.ts
 
 # one-off data with client PII — never commit
 /scripts/client-emails.json
+/scripts/client-brands.json
