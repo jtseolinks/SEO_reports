@@ -13,10 +13,8 @@
 # testing
 /coverage
 
-# next.js — include production build, exclude dev cache and source maps
-/.next/dev/
-/.next/cache/
-/.next/**/*.map
+# next.js — build on the server (Cloudways) after each pull; never track the build
+/.next/
 /out/
 
 # production

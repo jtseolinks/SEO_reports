@@ -197,7 +197,7 @@ async function getPlatformTransport(): Promise<{
   fromName: string;
 }> {
   let host      = process.env.SMTP_HOST;
-  let portStr   = process.env.SMTP_PORT || "587";
+  let portStr   = process.env.SMTP_PORT;
   let user      = process.env.SMTP_USER;
   let pass      = process.env.SMTP_PASS;
   let fromEmail = process.env.SMTP_FROM;
@@ -206,7 +206,7 @@ async function getPlatformTransport(): Promise<{
   if (!host || !user || !pass) {
     const { prisma: db } = await import("./prisma");
     const smtpSettings = await db.agencySetting.findMany({
-      where: { key: { in: ["smtpHost", "smtpPort", "smtpUser", "smtpPass", "emailSenderEmail"] } },
+      where: { key: { in: ["smtpHost", "smtpUser", "smtpPass"] } },
       orderBy: { updatedAt: "desc" },
     });
     const byAgency: Record<string, Record<string, string>> = {};
@@ -214,13 +214,15 @@ async function getPlatformTransport(): Promise<{
       if (!byAgency[s.agencyId]) byAgency[s.agencyId] = {};
       byAgency[s.agencyId][s.key] = s.value;
     }
-    for (const cfg of Object.values(byAgency)) {
+    for (const [agencyId, cfg] of Object.entries(byAgency)) {
       if (cfg["smtpHost"] && cfg["smtpUser"] && cfg["smtpPass"]) {
-        host      = host      || cfg["smtpHost"];
-        portStr   = portStr   || cfg["smtpPort"] || "587";
-        user      = user      || cfg["smtpUser"];
-        pass      = pass      || cfg["smtpPass"];
-        fromEmail = fromEmail || cfg["emailSenderEmail"];
+        // Load via getAgencySettings so smtpPass is DECRYPTED (raw DB value is encrypted).
+        const settings = await getAgencySettings(agencyId);
+        host      = host      || settings.smtpHost;
+        portStr   = portStr   || settings.smtpPort;
+        user      = user      || settings.smtpUser;
+        pass      = pass      || settings.smtpPass;
+        fromEmail = fromEmail || settings.emailSenderEmail;
         break;
       }
     }
@@ -230,7 +232,7 @@ async function getPlatformTransport(): Promise<{
     throw new Error("SMTP לא מוגדר — הגדר SMTP_HOST / SMTP_USER / SMTP_PASS ב-.env.local או בהגדרות הסוכנות");
   }
 
-  const port = parseInt(portStr);
+  const port = parseInt(portStr || "587");
   const transporter = nodemailer.createTransport({
     host, port, secure: port === 465, auth: { user, pass },
   });

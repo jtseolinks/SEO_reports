@@ -1,1 +1,0 @@
-globalThis.__RSC_MANIFEST=(globalThis.__RSC_MANIFEST||{});globalThis.__RSC_MANIFEST["/api/google/gsc-sites/route"]={"moduleLoading":{"prefix":"/_next/"},"ssrModuleMapping":{},"edgeSSRModuleMapping":{},"clientModules":{},"entryCSSFiles":{"C:\\Users\\97252\\Desktop\\SEO_reports\\app\\api\\google\\gsc-sites\\route":[]},"rscModuleMapping":{},"edgeRscModuleMapping":{}};
