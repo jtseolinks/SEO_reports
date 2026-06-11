@@ -29,10 +29,12 @@ export async function POST(req: NextRequest, { params }: Params) {
   if (data.expired) return NextResponse.json({ error: "הקישור פג תוקף" }, { status: 410 });
 
   const body = (await req.json()) as {
-    step: "password" | "agency-details" | "complete";
+    step: "password" | "agency-details" | "email" | "complete";
     password?: string;
     name?: string;
     agencyDisplayName?: string;
+    emailSenderEmail?: string;
+    emailSenderName?: string;
   };
 
   // Step 1 — set password (required before anything else)
@@ -60,6 +62,25 @@ export async function POST(req: NextRequest, { params }: Params) {
         update: { value: body.agencyDisplayName.trim() },
       });
     }
+    return NextResponse.json({ ok: true });
+  }
+
+  // Step 5 — optional email sender identity (the "From" for this agency's mail)
+  if (body.step === "email") {
+    const updates: { key: string; value: string }[] = [];
+    if (typeof body.emailSenderEmail === "string")
+      updates.push({ key: "emailSenderEmail", value: body.emailSenderEmail.trim() });
+    if (typeof body.emailSenderName === "string")
+      updates.push({ key: "emailSenderName", value: body.emailSenderName.trim() });
+    await Promise.all(
+      updates.map((u) =>
+        prisma.agencySetting.upsert({
+          where:  { agencyId_key: { agencyId: data.agencyId, key: u.key } },
+          create: { agencyId: data.agencyId, key: u.key, value: u.value },
+          update: { value: u.value },
+        })
+      )
+    );
     return NextResponse.json({ ok: true });
   }
 

@@ -31,6 +31,9 @@ export function OnboardClient({ token, agencyName, email, userName, isOwner }: P
   const [showPw,   setShowPw]   = useState(false);
   // Step 2 — agency details
   const [agencyDisplayName, setAgencyDisplayName] = useState(agencyName);
+  // Step 5 — email sender (the "From" for reports sent to this agency's clients)
+  const [senderEmail, setSenderEmail] = useState(email);
+  const [senderName,  setSenderName]  = useState(agencyName);
 
   const totalSteps = STEPS.length;
   const progress   = ((step + 1) / (totalSteps + 1)) * 100; // +1 for complete step
@@ -85,7 +88,22 @@ export function OnboardClient({ token, agencyName, email, userName, isOwner }: P
   }
 
   async function handleComplete() {
-    setError(""); setLoading(true);
+    setError("");
+    const fromEmail = senderEmail.trim();
+    if (fromEmail && !fromEmail.includes("@")) { setError("כתובת שולח לא תקינה"); return; }
+    setLoading(true);
+
+    // Save the email sender (From) before completing — non-empty only.
+    try {
+      if (fromEmail) {
+        await apiPost({ step: "email", emailSenderEmail: fromEmail, emailSenderName: senderName.trim() });
+      }
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "שגיאה בשמירת הגדרות המייל");
+      setLoading(false);
+      return;
+    }
+
     try {
       await apiPost({ step: "complete" });
       // Auto-login
@@ -275,14 +293,31 @@ export function OnboardClient({ token, agencyName, email, userName, isOwner }: P
             <>
               <h2 style={styles.cardTitle}>הגדרות אימייל</h2>
               <p style={{ color: "#6b7280", fontSize: 13, marginTop: 0, marginBottom: 24 }}>
-                הגדר את כתובת השולח ותבנית המייל לדוחות שנשלחים ללקוחות. ניתן להגדיר בהמשך.
+                בחר את הכתובת והשם שמהם יישלחו הדוחות ללקוחות שלך. ניתן לשנות בהמשך.
               </p>
-              <div style={styles.infoBox}>
-                <p style={{ margin: "0 0 8px", fontWeight: 700, fontSize: 14 }}>כיצד להגדיר לאחר הכניסה:</p>
-                <p style={{ margin: 0, fontSize: 13, color: "#374151", lineHeight: 1.7 }}>
-                  עבור אל <strong>הגדרות → אימייל ושליחות</strong> כדי להגדיר את
-                  כתובת השולח, תבנית המייל, לוגו ונמענים בעותק נסתר.
-                  שרת הדואר עצמו מנוהל מרכזית — אין צורך להגדיר אותו.
+
+              <label style={styles.label}>כתובת השולח (From)</label>
+              <input
+                style={styles.input}
+                type="email"
+                dir="ltr"
+                value={senderEmail}
+                onChange={e => setSenderEmail(e.target.value)}
+                placeholder="reports@agency.co.il"
+              />
+
+              <label style={{ ...styles.label, marginTop: 16 }}>שם השולח</label>
+              <input
+                style={styles.input}
+                value={senderName}
+                onChange={e => setSenderName(e.target.value)}
+                placeholder={agencyName}
+              />
+
+              <div style={{ ...styles.infoBox, marginTop: 18 }}>
+                <p style={{ margin: 0, fontSize: 12.5, color: "#374151", lineHeight: 1.7 }}>
+                  שרת הדואר מנוהל מרכזית — אין צורך להגדיר אותו. תבנית המייל, לוגו ונמענים
+                  בעותק נסתר (BCC) זמינים אח״כ ב<strong>הגדרות → אימייל ושליחות</strong>.
                 </p>
               </div>
               <button
