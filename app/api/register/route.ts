@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
+import { validatePassword } from "@/lib/password";
 
 // Simple in-memory rate limiter: max 5 registrations per IP per hour.
 const _reg: Map<string, { count: number; resetAt: number }> = new Map();
@@ -59,8 +60,9 @@ export async function POST(req: NextRequest) {
 
   if (!agencyName?.trim()) return NextResponse.json({ error: "שם הסוכנות נדרש" }, { status: 400 });
   if (!email?.trim()) return NextResponse.json({ error: "אימייל נדרש" }, { status: 400 });
-  if (!password || password.length < 8)
-    return NextResponse.json({ error: "סיסמה חייבת לכלול לפחות 8 תווים" }, { status: 400 });
+  if (!password) return NextResponse.json({ error: "סיסמה נדרשת" }, { status: 400 });
+  const pwError = validatePassword(password);
+  if (pwError) return NextResponse.json({ error: pwError }, { status: 400 });
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
     return NextResponse.json({ error: "כתובת אימייל לא תקינה" }, { status: 400 });
 

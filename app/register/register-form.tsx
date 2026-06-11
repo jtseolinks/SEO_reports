@@ -4,6 +4,7 @@ import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { AlertCircle, Loader2, CheckCircle2, Eye, EyeOff } from "lucide-react";
+import { validatePassword } from "@/lib/password";
 
 export function RegisterForm() {
   const router = useRouter();
@@ -19,6 +20,8 @@ export function RegisterForm() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+    const pwErr = validatePassword(password);
+    if (pwErr) { setError(pwErr); return; }
     setLoading(true);
     try {
       const res = await fetch("/api/register", {
@@ -96,7 +99,7 @@ export function RegisterForm() {
               type={showPw ? "text" : "password"}
               className="rk-input"
               value={password} onChange={e => setPassword(e.target.value)}
-              placeholder="לפחות 8 תווים" required
+              placeholder="8+ תווים, אות גדולה, קטנה וספרה" required
               autoComplete="new-password"
               style={{ direction: "ltr", textAlign: "start", paddingInlineEnd: 36 }}
             />
@@ -113,7 +116,7 @@ export function RegisterForm() {
               {showPw ? <EyeOff size={15} /> : <Eye size={15} />}
             </button>
           </div>
-          <p style={{ fontSize: 11, color: "var(--text-faint)", marginTop: 4 }}>מינימום 8 תווים</p>
+          <p style={{ fontSize: 11, color: "var(--text-faint)", marginTop: 4 }}>לפחות 8 תווים, כולל אות גדולה, אות קטנה וספרה</p>
         </div>
 
         {error && (

@@ -1,5 +1,6 @@
 import { randomBytes, createHash } from "crypto";
 import { prisma } from "./prisma";
+import { validatePassword } from "./password";
 import type { MembershipRole } from "./generated/prisma/client";
 
 const EXPIRY_MS = 7 * 24 * 60 * 60 * 1000;
@@ -54,7 +55,8 @@ export async function acceptInvitation(
     userId = existing.id;
   } else {
     if (!userData?.name || !userData?.password) throw new Error("שם וסיסמה נדרשים");
-    if (userData.password.length < 8) throw new Error("הסיסמה חייבת להכיל לפחות 8 תווים");
+    const pwError = validatePassword(userData.password);
+    if (pwError) throw new Error(pwError);
     const { hash } = await import("bcryptjs");
     const hashed = await hash(userData.password, 12);
     const user = await prisma.user.create({

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { signIn } from "next-auth/react";
+import { validatePassword } from "@/lib/password";
 
 type Props = {
   token: string;
@@ -50,7 +51,8 @@ export function OnboardClient({ token, agencyName, email, userName, isOwner }: P
   }
 
   async function handlePasswordStep() {
-    if (!password || password.length < 8) { setError("סיסמא חייבת להכיל לפחות 8 תווים"); return; }
+    const pwErr = validatePassword(password);
+    if (pwErr) { setError(pwErr); return; }
     if (password !== confirm) { setError("הסיסמאות אינן תואמות"); return; }
     setError(""); setLoading(true);
     try {
@@ -198,7 +200,7 @@ export function OnboardClient({ token, agencyName, email, userName, isOwner }: P
                 <input
                   style={styles.input}
                   type={showPw ? "text" : "password"}
-                  placeholder="מינימום 8 תווים"
+                  placeholder="8+ תווים, אות גדולה, קטנה וספרה"
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   onKeyDown={e => e.key === "Enter" && handlePasswordStep()}

@@ -5,6 +5,7 @@ import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { HashMark } from "@/components/brand/hash-mark";
 import { CheckCircle2, AlertCircle, Loader2, Eye, EyeOff } from "lucide-react";
+import { validatePassword } from "@/lib/password";
 
 const ROLE_LABELS: Record<string, string> = {
   OWNER: "בעלים",
@@ -30,8 +31,13 @@ export function AcceptForm({ token, agencyName, email, role, userExists }: Props
   const [done, setDone] = useState(false);
 
   async function handleAccept() {
-    setLoading(true);
     setError("");
+    // New users set a password here — enforce the shared strength policy.
+    if (!userExists) {
+      const pwErr = validatePassword(password);
+      if (pwErr) { setError(pwErr); return; }
+    }
+    setLoading(true);
     try {
       const res = await fetch("/api/invite/accept", {
         method: "POST",
@@ -162,7 +168,7 @@ export function AcceptForm({ token, agencyName, email, role, userExists }: Props
                       value={password}
                       onChange={e => setPassword(e.target.value)}
                       type={showPw ? "text" : "password"}
-                      placeholder="לפחות 8 תווים"
+                      placeholder="8+ תווים, אות גדולה, קטנה וספרה"
                       dir="ltr"
                       style={{ paddingInlineEnd: 36 }}
                     />

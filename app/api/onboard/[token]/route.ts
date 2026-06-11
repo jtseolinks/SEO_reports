@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSetupToken, consumeSetupToken } from "@/lib/setup-token";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
+import { validatePassword } from "@/lib/password";
 
 type Params = { params: Promise<{ token: string }> };
 
@@ -39,8 +40,12 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   // Step 1 — set password (required before anything else)
   if (body.step === "password") {
-    if (!body.password || body.password.length < 8) {
-      return NextResponse.json({ error: "סיסמא חייבת להכיל לפחות 8 תווים" }, { status: 400 });
+    if (!body.password) {
+      return NextResponse.json({ error: "סיסמה נדרשת" }, { status: 400 });
+    }
+    const pwError = validatePassword(body.password);
+    if (pwError) {
+      return NextResponse.json({ error: pwError }, { status: 400 });
     }
     const hash = await bcrypt.hash(body.password, 12);
     await prisma.user.update({

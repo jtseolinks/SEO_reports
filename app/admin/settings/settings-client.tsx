@@ -5,9 +5,10 @@ import { useRouter } from "next/navigation";
 import {
   Building2, Sparkles, Mail, Calendar, Users,
   Upload, Trash2, CheckCircle2, AlertCircle, Loader2,
-  Plus, X, Eye, EyeOff, Shield, Pencil, Check, Code2,
+  Plus, X, Eye, EyeOff, Shield, Pencil, Check, Code2, KeyRound,
 } from "lucide-react";
 import type { AgencySettings } from "@/lib/agency-settings";
+import { validatePassword } from "@/lib/password";
 
 // ── Section definitions ───────────────────────────────────────────────────────
 
@@ -703,6 +704,7 @@ function TeamSection({ currentUserRole }: { currentUserRole: string }) {
   const [editRole, setEditRole]   = useState("ADMIN");
   const [editErr, setEditErr]     = useState("");
   const [saving, setSaving]       = useState(false);
+  const [resetting, setResetting] = useState<string | null>(null);
 
   // ── Invitations state ─────────────────────────────────────────────────────
   const [invitations, setInvitations]   = useState<InviteRecord[]>([]);
@@ -726,6 +728,8 @@ function TeamSection({ currentUserRole }: { currentUserRole: string }) {
 
   async function addUser() {
     if (!newEmail || !newPassword) { setAddErr("אימייל וסיסמה נדרשים"); return; }
+    const pwErr = validatePassword(newPassword);
+    if (pwErr) { setAddErr(pwErr); return; }
     setAdding(true); setAddErr("");
     try {
       const res = await fetch("/api/settings/users", {
@@ -749,6 +753,24 @@ function TeamSection({ currentUserRole }: { currentUserRole: string }) {
       if (res.ok) setUsers(prev => prev.filter(u => u.id !== id));
     } finally {
       setDeleting(null);
+    }
+  }
+
+  async function resetUserPassword(id: string, userEmail: string) {
+    if (!confirm(`לשלוח קישור לאיפוס סיסמה אל ${userEmail}?`)) return;
+    setResetting(id);
+    try {
+      const res = await fetch(`/api/settings/users/${id}/reset-password`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) { alert(data.error ?? "שגיאה באיפוס הסיסמה"); return; }
+      if (data.emailSent) {
+        alert(`קישור לאיפוס סיסמה נשלח אל ${userEmail}`);
+      } else if (data.resetUrl) {
+        await navigator.clipboard.writeText(data.resetUrl);
+        alert("שליחת המייל נכשלה — קישור האיפוס הועתק ללוח. שלח אותו ידנית למשתמש.");
+      }
+    } finally {
+      setResetting(null);
     }
   }
 
@@ -1023,6 +1045,13 @@ function TeamSection({ currentUserRole }: { currentUserRole: string }) {
                             {(isOwner || u.role === "MEMBER") && (
                               <button onClick={() => startEdit(u)} className="iconbtn" title="עריכה">
                                 <Pencil size={13} />
+                              </button>
+                            )}
+                            {/* Reset password: OWNER for anyone; ADMIN for non-owners */}
+                            {(isOwner || u.role !== "OWNER") && (
+                              <button onClick={() => resetUserPassword(u.id, u.email)} disabled={resetting === u.id}
+                                className="iconbtn" title="אפס סיסמה — שלח קישור איפוס">
+                                {resetting === u.id ? <Loader2 size={13} className="animate-spin" /> : <KeyRound size={13} />}
                               </button>
                             )}
                             {/* Remove button: OWNER can remove ADMIN/MEMBER; ADMIN can only remove MEMBERs */}
