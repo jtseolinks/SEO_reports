@@ -44,3 +44,6 @@ next-env.d.ts
 /public/reports/
 /private/
 *.pdf
+
+# one-off data with client PII — never commit
+/scripts/client-emails.json
