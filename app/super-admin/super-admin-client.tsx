@@ -181,10 +181,12 @@ function CreateAgencyModal({ onClose, onCreated }: { onClose: () => void; onCrea
   // When email send fails — show the setup URL so admin can share manually
   const [fallbackUrl, setFallbackUrl] = useState("");
   const [emailErr, setEmailErr]       = useState("");
+  // When email send succeeds — show a confirmation instead of closing silently
+  const [sentOk, setSentOk]           = useState(false);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    setErr(""); setFallbackUrl(""); setEmailErr(""); setLoading(true);
+    setErr(""); setFallbackUrl(""); setEmailErr(""); setSentOk(false); setLoading(true);
     try {
       const res = await fetch("/api/super-admin/agencies", {
         method:"POST", headers:{"Content-Type":"application/json"},
@@ -197,9 +199,34 @@ function CreateAgencyModal({ onClose, onCreated }: { onClose: () => void; onCrea
         setFallbackUrl(data.setupUrl ?? "");
         setEmailErr(data.emailError ?? "שגיאה בשליחת המייל");
       } else {
-        onCreated();
+        // Email sent — show explicit confirmation (don't close silently)
+        setSentOk(true);
       }
     } finally { setLoading(false); }
+  }
+
+  // Email sent successfully — explicit confirmation
+  if (sentOk) {
+    return (
+      <Modal title="סוכנות נוצרה ✓" onClose={onCreated}>
+        <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
+          <div style={{ display:"flex", alignItems:"flex-start", gap:10, padding:"12px 14px",
+            background:"#ecfdf5", border:"1px solid #a7f3d0", borderRadius:"var(--r-md)" }}>
+            <CheckCircle2 size={16} style={{ color:"#16a34a", flexShrink:0, marginTop:1 }}/>
+            <div style={{ fontSize:13 }}>
+              <strong>מייל ההגדרה נשלח לבעלים.</strong><br/>
+              <span style={{ color:"var(--text-muted)", direction:"ltr", display:"inline-block" }}>{ownerEmail}</span>
+            </div>
+          </div>
+          <p style={{ fontSize:11, color:"var(--text-muted)", margin:0 }}>
+            אם המייל לא הגיע — בדוק את תיקיית הספאם, או שלח מחדש מתוך טבלת הסוכנויות.
+          </p>
+          <button className="btn btn-primary" onClick={onCreated}>
+            <CheckCircle2 size={14} style={{ display:"inline", marginLeft:5 }}/> סגור
+          </button>
+        </div>
+      </Modal>
+    );
   }
 
   // If email failed — show the fallback URL and let admin close

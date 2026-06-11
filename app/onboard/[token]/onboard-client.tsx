@@ -270,18 +270,19 @@ export function OnboardClient({ token, agencyName, email, userName, isOwner }: P
             </>
           )}
 
-          {/* ─── Step 4: SMTP (skippable) ─── */}
+          {/* ─── Step 4: Email sender (skippable) ─── */}
           {step === 4 && (
             <>
               <h2 style={styles.cardTitle}>הגדרות אימייל</h2>
               <p style={{ color: "#6b7280", fontSize: 13, marginTop: 0, marginBottom: 24 }}>
-                הגדר שרת SMTP לשליחת דוחות ללקוחות. ניתן להגדיר בהמשך.
+                הגדר את כתובת השולח ותבנית המייל לדוחות שנשלחים ללקוחות. ניתן להגדיר בהמשך.
               </p>
               <div style={styles.infoBox}>
                 <p style={{ margin: "0 0 8px", fontWeight: 700, fontSize: 14 }}>כיצד להגדיר לאחר הכניסה:</p>
                 <p style={{ margin: 0, fontSize: 13, color: "#374151", lineHeight: 1.7 }}>
-                  עבור אל <strong>הגדרות → אימייל ו-SMTP</strong> כדי להגדיר שרת דואר,
-                  תבנית מייל, לוגו ונמענים בעותק נסתר.
+                  עבור אל <strong>הגדרות → אימייל ושליחות</strong> כדי להגדיר את
+                  כתובת השולח, תבנית המייל, לוגו ונמענים בעותק נסתר.
+                  שרת הדואר עצמו מנוהל מרכזית — אין צורך להגדיר אותו.
                 </p>
               </div>
               <button

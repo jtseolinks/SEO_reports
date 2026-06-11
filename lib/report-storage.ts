@@ -26,9 +26,13 @@ export function reportFilePath(agencyId: string, filename: string): string {
   return path.join(REPORTS_DIR, path.basename(agencyId), path.basename(filename));
 }
 
-// Resolve a stored pdfUrl ("/reports/<agencyId>/<file>") to an absolute path.
+// Resolve a stored pdfUrl to an absolute path. Handles both URL shapes:
+//   legacy:    /reports/<agencyId>/<file>.pdf
+//   canonical: /reports/<agencyId>/<file>.pdf/file   (trailing "/file" for Cloudways)
 export function reportFilePathFromUrl(pdfUrl: string): string {
-  const parts = pdfUrl.split("/").filter(Boolean); // ["reports", agencyId, file]
+  let parts = pdfUrl.split("/").filter(Boolean);
+  // Drop the trailing "/file" segment so the real filename is the last part.
+  if (parts[parts.length - 1] === "file") parts = parts.slice(0, -1);
   const filename = parts[parts.length - 1] ?? "";
   const agencyId = parts.length >= 3 ? parts[parts.length - 2] : "";
   return reportFilePath(agencyId, filename);

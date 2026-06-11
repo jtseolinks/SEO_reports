@@ -18,24 +18,30 @@ export async function POST(request: NextRequest, { params }: Params) {
 
   const { id } = await params;
 
-  const report = await prisma.monthlyReport.findFirst({
-    where: { id, agencyId: ctx.agencyId },
-    include: { client: true },
-  });
+  try {
+    const report = await prisma.monthlyReport.findFirst({
+      where: { id, agencyId: ctx.agencyId },
+      include: { client: true },
+    });
 
-  if (!report) return NextResponse.json({ error: "Report not found" }, { status: 404 });
-  if (!report.pdfUrl) return NextResponse.json({ error: "PDF not generated yet" }, { status: 400 });
+    if (!report) return NextResponse.json({ error: "Report not found" }, { status: 404 });
+    if (!report.pdfUrl) return NextResponse.json({ error: "PDF not generated yet" }, { status: 400 });
 
-  const monthName = getMonthName(report.reportMonth);
+    const monthName = getMonthName(report.reportMonth);
 
-  const messageId = await sendReportEmail({
-    agencyId: ctx.agencyId,
-    to,
-    cc: [],
-    clientName: report.client.name,
-    monthName,
-    pdfUrl: report.pdfUrl,
-  });
+    const messageId = await sendReportEmail({
+      agencyId: ctx.agencyId,
+      to,
+      cc: [],
+      clientName: report.client.name,
+      monthName,
+      pdfUrl: report.pdfUrl,
+    });
 
-  return NextResponse.json({ success: true, messageId });
+    return NextResponse.json({ success: true, messageId });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("Report send-test error:", err);
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
 }
