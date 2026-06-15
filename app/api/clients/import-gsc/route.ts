@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAgency, toResponse } from "@/lib/authz";
+import { getAgencySettings } from "@/lib/agency-settings";
+import { parseDefaultSendDay } from "@/lib/schedule";
 
 type ImportSite = {
   siteUrl: string;
@@ -25,6 +27,8 @@ export async function POST(request: NextRequest) {
   }
 
   const { sites }: { sites: ImportSite[] } = await request.json();
+  // Imported clients follow the agency's global default send day (non-custom).
+  const defaultSendDay = parseDefaultSendDay((await getAgencySettings(ctx.agencyId)).defaultSendDay);
   const results = [];
 
   for (const site of sites) {
@@ -44,7 +48,7 @@ export async function POST(request: NextRequest) {
         domain,
         contactEmail: "",
         status: "ACTIVE",
-        reportSendDay: 5,
+        reportSendDay: defaultSendDay,
         googleProperties: {
           create: {
             gscSiteUrl: site.siteUrl,

@@ -12,6 +12,7 @@ export type ReportPeriod = {
 export function getReportPeriods(reportMonth: string): {
   current: ReportPeriod;
   previous: ReportPeriod;
+  previous2: ReportPeriod;
 } {
   // reportMonth = "2026-05"
   const [year, month] = reportMonth.split("-").map(Number);
@@ -21,13 +22,18 @@ export function getReportPeriods(reportMonth: string): {
   const prevStart = new Date(year, month - 2, 1);
   const prevEnd = new Date(year, month - 1, 0);
 
+  // Two months before the report month — for the per-keyword position trend.
+  const prev2Start = new Date(year, month - 3, 1);
+  const prev2End = new Date(year, month - 2, 0);
+
   const fmt = (d: Date) => d.toISOString().split("T")[0];
   const lbl = (d: Date) =>
     d.toLocaleDateString("en-US", { month: "long", year: "numeric" });
 
   return {
-    current: { startDate: fmt(currentStart), endDate: fmt(currentEnd), label: lbl(currentStart) },
-    previous: { startDate: fmt(prevStart), endDate: fmt(prevEnd), label: lbl(prevStart) },
+    current:   { startDate: fmt(currentStart), endDate: fmt(currentEnd), label: lbl(currentStart) },
+    previous:  { startDate: fmt(prevStart),    endDate: fmt(prevEnd),    label: lbl(prevStart) },
+    previous2: { startDate: fmt(prev2Start),   endDate: fmt(prev2End),   label: lbl(prev2Start) },
   };
 }
 
@@ -54,6 +60,7 @@ export type ReportData = {
   };
   period: ReportPeriod;
   comparisonPeriod: ReportPeriod;
+  comparisonPeriod2: ReportPeriod;
   gsc: {
     clicks: ReportMetricChange;
     impressions: ReportMetricChange;
@@ -80,6 +87,7 @@ export type ReportData = {
     ctr: number;
     position: number;
     prevPosition: number;
+    prev2Position: number;
     change: number;
   }>;
   trackedKeywords: Array<{ keyword: string; matchType: string; isBrand: boolean }>;
@@ -102,7 +110,7 @@ export async function buildReportData(
   if (!client.googleProperties) throw new Error("Client has no Google property mapping");
 
   const { gscSiteUrl, ga4PropertyId } = client.googleProperties;
-  const { current: defaultCurrent, previous } = getReportPeriods(reportMonth);
+  const { current: defaultCurrent, previous, previous2 } = getReportPeriods(reportMonth);
   const current = customDates
     ? { ...customDates, label: `${customDates.startDate} – ${customDates.endDate}` }
     : defaultCurrent;
@@ -117,12 +125,14 @@ export async function buildReportData(
   const [
     currentGscQueries,
     previousGscQueries,
+    previous2GscQueries,
     currentGscPages,
     previousGscPages,
     trendRaw,
   ] = await Promise.all([
     fetchGscSummary(auth, gscSiteUrl, current.startDate, current.endDate, ["query"]),
     fetchGscSummary(auth, gscSiteUrl, previous.startDate, previous.endDate, ["query"]),
+    fetchGscSummary(auth, gscSiteUrl, previous2.startDate, previous2.endDate, ["query"]),
     fetchGscSummary(auth, gscSiteUrl, current.startDate, current.endDate, ["page"]),
     fetchGscSummary(auth, gscSiteUrl, previous.startDate, previous.endDate, ["page"]),
     fetchGscDailyTrend(auth, gscSiteUrl, current.startDate, current.endDate),
@@ -167,6 +177,7 @@ export async function buildReportData(
 
   // Build query lookup maps
   const prevQueryMap = new Map(nonBrandPrevQueries.map((r) => [r.query, r]));
+  const prev2QueryMap = new Map(previous2GscQueries.filter((r) => isNonBrand(r.query)).map((r) => [r.query, r]));
   const prevPageMap = new Map(previousGscPages.map((r) => [r.page, r]));
 
   // Rising and declining queries (position changed significantly)
@@ -203,6 +214,7 @@ export async function buildReportData(
 
     const matched = currentGscQueries.filter((r) => r.query && matchFn(r.query.toLowerCase()));
     const matchedPrev = previousGscQueries.filter((r) => r.query && matchFn(r.query?.toLowerCase() ?? ""));
+    const matchedPrev2 = previous2GscQueries.filter((r) => r.query && matchFn(r.query?.toLowerCase() ?? ""));
 
     const clicks = matched.reduce((s, r) => s + r.clicks, 0);
     const impressions = matched.reduce((s, r) => s + r.impressions, 0);
@@ -214,6 +226,10 @@ export async function buildReportData(
     const prevPosition = matchedPrev.length > 0
       ? matchedPrev.reduce((s, r) => s + r.position * r.impressions, 0) / (prevImp || 1)
       : 0;
+    const prev2Imp = matchedPrev2.reduce((s, r) => s + r.impressions, 0);
+    const prev2Position = matchedPrev2.length > 0
+      ? matchedPrev2.reduce((s, r) => s + r.position * r.impressions, 0) / (prev2Imp || 1)
+      : 0;
 
     return {
       keyword: kw.keyword,
@@ -223,6 +239,7 @@ export async function buildReportData(
       ctr,
       position,
       prevPosition,
+      prev2Position,
       change: prevPosition > 0 ? prevPosition - position : 0,
     };
   });
@@ -239,6 +256,7 @@ export async function buildReportData(
         .slice(0, 100)
         .map((r) => {
           const prevPosition = prevQueryMap.get(r.query ?? "")?.position ?? 0;
+          const prev2Position = prev2QueryMap.get(r.query ?? "")?.position ?? 0;
           return {
             keyword: r.query ?? "",
             isBrand: false,
@@ -247,6 +265,7 @@ export async function buildReportData(
             ctr: r.ctr * 100,
             position: r.position,
             prevPosition,
+            prev2Position,
             change: prevPosition > 0 ? prevPosition - r.position : 0,
           };
         });
@@ -269,6 +288,7 @@ export async function buildReportData(
     client: { id: client.id, name: client.name, domain: client.domain },
     period: current,
     comparisonPeriod: previous,
+    comparisonPeriod2: previous2,
     gsc: {
       clicks: metricChange(aggCurrent.clicks, aggPrevious.clicks),
       impressions: metricChange(aggCurrent.impressions, aggPrevious.impressions),

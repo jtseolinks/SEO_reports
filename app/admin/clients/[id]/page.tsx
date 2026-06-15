@@ -4,6 +4,8 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { ClientDetailPage } from "./client-detail-page";
 import { requireAgencyPage } from "@/lib/authz";
+import { getAgencySettings } from "@/lib/agency-settings";
+import { parseDefaultSendDay, DEFAULT_SEND_HOUR } from "@/lib/schedule";
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -28,8 +30,12 @@ export default async function ClientDetailRoute({ params }: Props) {
 
   if (!client) notFound();
 
+  const defaultSendDay = parseDefaultSendDay((await getAgencySettings(ctx.agencyId)).defaultSendDay);
+
   return (
     <ClientDetailPage
+      defaultSendDay={defaultSendDay}
+      defaultSendHour={DEFAULT_SEND_HOUR}
       client={{
         id: client.id,
         name: client.name,

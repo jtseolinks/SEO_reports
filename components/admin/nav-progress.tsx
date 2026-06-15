@@ -117,19 +117,28 @@ export function NavProgress() {
         }}
       />
 
+      {/* Centering wrapper — keeps the card centered regardless of the card's
+          own animation transform (which would otherwise override translate). */}
+      <div
+        style={{
+          position: "fixed",
+          inset: 0,
+          zIndex: 9999,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          pointerEvents: "none",
+        }}
+      >
       {/* Card */}
       <div
         aria-label="טוען"
         role="status"
         style={{
-          position: "fixed",
-          top: "50%",
-          left: "50%",
-          transform: "translate(-50%, -50%)",
-          zIndex: 9999,
           background: "#FFFFFF",
           borderRadius: "20px",
           padding: "32px 40px",
+          position: "relative",
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
@@ -208,6 +217,7 @@ export function NavProgress() {
         >
           טוען...
         </span>
+      </div>
       </div>
     </>
   );

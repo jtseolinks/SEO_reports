@@ -34,7 +34,10 @@ export default function NewClientPage() {
             .split(",")
             .map((s) => s.trim())
             .filter(Boolean),
-          reportSendDay: parseInt(fd.get("reportSendDay") as string) || 5,
+          // Blank → omitted so the client follows the global default send day.
+          reportSendDay: (fd.get("reportSendDay") as string)?.trim()
+            ? parseInt(fd.get("reportSendDay") as string)
+            : null,
           notes: fd.get("notes") || null,
         }),
       });
@@ -86,7 +89,7 @@ export default function NewClientPage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="reportSendDay">Report Send Day (1–28)</Label>
-              <Input id="reportSendDay" name="reportSendDay" type="number" min="1" max="28" defaultValue="5" />
+              <Input id="reportSendDay" name="reportSendDay" type="number" min="1" max="28" placeholder="Default from global settings" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="notes">Notes</Label>

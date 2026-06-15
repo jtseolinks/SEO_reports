@@ -9,6 +9,8 @@ import {
 import { BulkGenerateButton } from "@/app/admin/_components/BulkGenerateModal";
 import { DashboardClientsTable } from "@/app/admin/_components/DashboardClientsTable";
 import { requireAgencyPage } from "@/lib/authz";
+import { getAgencySettings } from "@/lib/agency-settings";
+import { effectiveSendDay, parseDefaultSendDay } from "@/lib/schedule";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -104,6 +106,7 @@ async function getDashboardData(agencyId: string) {
     reportsThisMonth,
     clients,
     recentReports,
+    settings,
   ] = await Promise.all([
     prisma.client.count({ where: { agencyId } }),
     prisma.client.count({ where: { agencyId, createdAt: { gte: startOfMonth } } }),
@@ -133,7 +136,10 @@ async function getDashboardData(agencyId: string) {
       orderBy: { updatedAt: "desc" },
       take: 8,
     }),
+    getAgencySettings(agencyId),
   ]);
+
+  const defaultSendDay = parseDefaultSendDay(settings.defaultSendDay);
 
   const sentCount      = reportsThisMonth.filter(r => r.status === "SENT").length;
   const generatedCount = reportsThisMonth.filter(r => r.status === "GENERATED").length;
@@ -156,7 +162,7 @@ async function getDashboardData(agencyId: string) {
     date: string; daysUntil: number; collectionDate: string; clientCount: number;
   } | null = null;
   if (schedulable.length > 0) {
-    const upcoming = schedulable.map((c) => nextSendDate(c.reportSendDay).getTime());
+    const upcoming = schedulable.map((c) => nextSendDate(effectiveSendDay(c, defaultSendDay)).getTime());
     const minTime = Math.min(...upcoming);
     nextReport = {
       date: new Date(minTime).toISOString(),
@@ -170,6 +176,7 @@ async function getDashboardData(agencyId: string) {
     totalClients, newThisMonth,
     sentCount, generatedCount, pendingCount, failedCount, coveredCount, coveragePct,
     clients, recentReports, currentMonth, currentMonthLabel, nextReport,
+    defaultSendDay,
   };
 }
 
@@ -192,7 +199,7 @@ export default async function AdminPage() {
       domain:              client.domain,
       industry:            client.industry,
       autoSend:            client.autoSend,
-      reportSendDay:       client.reportSendDay,
+      reportSendDay:       effectiveSendDay(client, d.defaultSendDay),
       hasProperties:       !!client.googleProperties,
       currentMonthStatus:  currentMonthReport?.status ?? null,
       currentMonthSentAt:  currentMonthReport?.sentAt?.toISOString() ?? null,

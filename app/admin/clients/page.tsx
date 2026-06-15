@@ -4,9 +4,12 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { ClientsTable } from "./clients-table";
 import { requireAgencyPage } from "@/lib/authz";
+import { getAgencySettings } from "@/lib/agency-settings";
+import { effectiveSendDay, parseDefaultSendDay } from "@/lib/schedule";
 
 export default async function ClientsPage() {
   const ctx = await requireAgencyPage();
+  const defaultSendDay = parseDefaultSendDay((await getAgencySettings(ctx.agencyId)).defaultSendDay);
   const clients = await prisma.client.findMany({
     where: { agencyId: ctx.agencyId },
     include: {
@@ -45,11 +48,12 @@ export default async function ClientsPage() {
         currentMonth={currentMonth}
         clients={clients.map((c) => {
           const lastReport = c.monthlyReports[0] ?? null;
+          const sendDay = effectiveSendDay(c, defaultSendDay);
           // Calculate next report date
           const today = new Date();
           let nextDate: Date | null = null;
           if (c.autoSend) {
-            const d = new Date(today.getFullYear(), today.getMonth(), c.reportSendDay);
+            const d = new Date(today.getFullYear(), today.getMonth(), sendDay);
             if (d <= today) d.setMonth(d.getMonth() + 1);
             nextDate = d;
           }
@@ -62,7 +66,7 @@ export default async function ClientsPage() {
             industry: c.industry ?? "",
             reportLanguage: c.reportLanguage,
             autoSend: c.autoSend,
-            reportSendDay: c.reportSendDay,
+            reportSendDay: sendDay,
             hasProperties: !!c.googleProperties,
             gscSiteUrl: c.googleProperties?.gscSiteUrl ?? null,
             lastReportStatus: lastReport?.status ?? null,

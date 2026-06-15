@@ -143,11 +143,15 @@ export function ClientDetailPage({
   properties,
   brandKeywords: initialBrandKeywords,
   reports: initialReports,
+  defaultSendDay,
+  defaultSendHour,
 }: {
   client: Client;
   properties: Properties;
   brandKeywords: string[];
   reports: Report[];
+  defaultSendDay: number;
+  defaultSendHour: number;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -299,6 +303,11 @@ export function ClientDetailPage({
   const [reportSendHour, setReportSendHour] = useState(initialClient.reportSendHour);
   const [sendDayCustom, setSendDayCustom] = useState(initialClient.sendDayCustom);
 
+  // Effective schedule shown/saved: non-custom clients track the global default
+  // live; custom clients use their own day/hour. See lib/schedule.ts.
+  const effSendDay  = sendDayCustom ? reportSendDay : defaultSendDay;
+  const effSendHour = sendDayCustom ? reportSendHour : defaultSendHour;
+
   // Active period — set by GscLivePanel, used for report generation
   const [activePeriod, setActivePeriod] = useState<{ startDate: string; endDate: string }>(() => {
     const today = new Date();
@@ -312,7 +321,7 @@ export function ClientDetailPage({
     setActivePeriod({ startDate, endDate });
   }, []);
 
-  const nextDate = calcNextReportDate(reportSendDay, autoSend);
+  const nextDate = calcNextReportDate(effSendDay, autoSend);
   const latestReport = reports[0] ?? null;
 
   // Central refresh — re-fetches all client-side data and triggers server re-render
@@ -334,12 +343,12 @@ export function ClientDetailPage({
           reportLanguage, autoSend,
           contactEmail: contact ?? client.contactEmail,
           ccEmails: cc,
-          reportSendDay, reportSendHour, sendDayCustom,
+          reportSendDay: effSendDay, reportSendHour: effSendHour, sendDayCustom,
           brandNameHe, brandNameEn, excludeFromReports,
         }),
       });
       if (res.ok) {
-        setClient(c => ({ ...c, reportLanguage, autoSend, contactEmail: contact, ccEmails: cc, reportSendDay, reportSendHour, sendDayCustom, brandNameHe, brandNameEn, excludeFromReports }));
+        setClient(c => ({ ...c, reportLanguage, autoSend, contactEmail: contact, ccEmails: cc, reportSendDay: effSendDay, reportSendHour: effSendHour, sendDayCustom, brandNameHe, brandNameEn, excludeFromReports }));
         // Merge auto-brand terms into the local brandKeywords state
         setBrandKeywords(prev => {
           const autoTerms = [brandNameHe, brandNameEn].filter(Boolean) as string[];
@@ -745,9 +754,6 @@ export function ClientDetailPage({
           <div className="card">
             <div className="card-head">
               <h3 className="card-title">הגדרות דוח</h3>
-              <button onClick={saveSettings} disabled={saving} className="btn btn-secondary sm">
-                {saving ? <Loader2 size={11} className="animate-spin" /> : null} שמור
-              </button>
             </div>
             <div className="card-pad" style={{ paddingTop: 4, display: "flex", flexDirection: "column", gap: 16 }}>
 
@@ -849,7 +855,7 @@ export function ClientDetailPage({
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 500, color: "var(--text)" }}>שליחה אוטומטית</div>
                   <div style={{ fontSize: 11, color: "var(--text-faint)" }}>
-                    {autoSend ? `יום ${reportSendDay} לכל חודש, ${String(reportSendHour).padStart(2, "0")}:00` : "כבוי"}
+                    {autoSend ? `יום ${effSendDay} לכל חודש, ${String(effSendHour).padStart(2, "0")}:00` : "כבוי"}
                   </div>
                 </div>
                 <Toggle value={autoSend} onChange={setAutoSend} disabled={excludeFromReports} />
@@ -886,7 +892,7 @@ export function ClientDetailPage({
                   <input
                     type="number"
                     min={1} max={28}
-                    value={reportSendDay}
+                    value={effSendDay}
                     onChange={e => {
                       const v = Math.min(28, Math.max(1, parseInt(e.target.value) || 1));
                       setReportSendDay(v);
@@ -896,7 +902,7 @@ export function ClientDetailPage({
                   />
                   <span style={{ fontSize: 12, color: "var(--text-faint)" }}>לכל חודש בשעה</span>
                   <select
-                    value={reportSendHour}
+                    value={effSendHour}
                     onChange={e => { setReportSendHour(parseInt(e.target.value)); setSendDayCustom(true); }}
                     style={{ height: 32, paddingInline: "10px", border: "1px solid var(--border)", borderRadius: "var(--r-sm)", background: "var(--surface)", fontSize: 13, fontFamily: "inherit", color: "var(--text)", outline: "none", cursor: "pointer" }}
                   >
@@ -906,6 +912,13 @@ export function ClientDetailPage({
                   </select>
                   <span style={{ fontSize: 11, color: "var(--text-faint)" }}>(שעון ישראל)</span>
                 </div>
+              </div>
+
+              {/* Save action — bottom of the report-settings section */}
+              <div style={{ display: "flex", justifyContent: "flex-end", borderTop: "1px solid var(--border-subtle)", paddingTop: 14 }}>
+                <button onClick={saveSettings} disabled={saving} className="btn btn-secondary sm">
+                  {saving ? <Loader2 size={11} className="animate-spin" /> : null} שמור
+                </button>
               </div>
             </div>
           </div>
@@ -1213,7 +1226,10 @@ export function ClientDetailPage({
         </div>{/* end sidebar */}
 
         {/* ── MAIN (left in RTL, 1fr): keywords only ── */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        {/* minWidth:0 lets this grid track shrink below the wide keyword table's
+            content so the table scrolls inside its own .table-wrap instead of
+            pushing the whole page wider. */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 16, minWidth: 0 }}>
 
           <ReportConfigPanel clientId={client.id} />
 
@@ -1335,11 +1351,15 @@ function DualLineChart({ trendData, loading }: {
 
 // ── GscLivePanel ──────────────────────────────────────────────────────────────
 
-const PERIOD_OPTIONS: { key: Period; label: string; days: number }[] = [
-  { key: "1m",     label: "28 ימים",    days: 28  },
-  { key: "3m",     label: "3 חודשים",  days: 90  },
-  { key: "6m",     label: "6 חודשים",  days: 180 },
-  { key: "custom", label: "טווח מותאם", days: 0  },
+// Period presets mirror Google Search Console's own ranges so the numbers line
+// up 1:1. GSC anchors every preset to the last day with data (≈3-day freshness
+// lag), and its "3/6 months" are calendar months — not 90/180 fixed days.
+const GSC_LAG_DAYS = 3;
+const PERIOD_OPTIONS: { key: Period; label: string; days?: number; months?: number }[] = [
+  { key: "1m",     label: "28 ימים",    days: 28 },
+  { key: "3m",     label: "3 חודשים",  months: 3 },
+  { key: "6m",     label: "6 חודשים",  months: 6 },
+  { key: "custom", label: "טווח מותאם" },
 ];
 
 function GscLivePanel({ clientId, hasProperties, onPeriodChange, refreshKey }: {
@@ -1363,12 +1383,18 @@ function GscLivePanel({ clientId, hasProperties, onPeriodChange, refreshKey }: {
 
   const { startDate, endDate } = useMemo(() => {
     if (period === "custom") return { startDate: customStart, endDate: customEnd };
-    const today = new Date();
-    const end = today.toISOString().split("T")[0];
     const opt = PERIOD_OPTIONS.find(p => p.key === period)!;
-    const s = new Date(today);
-    s.setDate(s.getDate() - opt.days);
-    return { startDate: s.toISOString().split("T")[0], endDate: end };
+    // End at GSC's last available day (today − freshness lag), like the GSC UI.
+    const end = new Date();
+    end.setDate(end.getDate() - GSC_LAG_DAYS);
+    const s = new Date(end);
+    if (opt.months) {
+      s.setMonth(s.getMonth() - opt.months);
+      s.setDate(s.getDate() + 1); // make the span inclusive of `end`
+    } else {
+      s.setDate(s.getDate() - (opt.days! - 1)); // N days inclusive of `end`
+    }
+    return { startDate: s.toISOString().split("T")[0], endDate: end.toISOString().split("T")[0] };
   }, [period, customStart, customEnd]);
 
   useEffect(() => {
@@ -1627,17 +1653,32 @@ function ReportConfigPanel({ clientId }: { clientId: string }) {
 
 // ── KeywordsPanel ─────────────────────────────────────────────────────────────
 
-type Keyword = { query: string; clicks: number; impressions: number; ctr: number; position: number };
+type Keyword = {
+  query: string; clicks: number; impressions: number; ctr: number; position: number;
+  prevPosition: number | null; prev2Position: number | null;
+};
 
-function PosBar({ pos }: { pos: number }) {
+// One position cell. Shows this period's position, plus a delta vs the PRIOR
+// (older) period — so each column reflects the change that happened from the
+// period before it to itself. Lower rank number = better. The arrow points the
+// way the site moved in Google results: climbed = green ▲ (number fell),
+// dropped = red ▼ (number rose). `prev` null → number only (oldest column, or
+// no data for the older window).
+function PosCell({ pos, prev }: { pos: number | null; prev: number | null }) {
+  if (pos == null) return <span style={{ color: "var(--text-faint)", fontSize: 12 }}>—</span>;
   const color = pos <= 3 ? "var(--green)" : pos <= 10 ? "var(--accent)" : pos <= 20 ? "var(--amber)" : "var(--text-faint)";
-  const w = Math.max(4, Math.min(100, Math.round(100 - (pos / 100) * 88)));
+  const num = <span style={{ fontWeight: 700, color, fontSize: 13, minWidth: 26, display: "inline-block" }}>{pos.toFixed(1)}</span>;
+  if (prev == null) return num;
+  const diff = pos - prev; // >0 → number rose vs older period (worse), <0 → fell (better)
+  const worse = diff > 0.05, better = diff < -0.05;
   return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-      <span style={{ fontWeight: 700, color, fontSize: 12, minWidth: 30 }}>{pos.toFixed(1)}</span>
-      <span style={{ display: "inline-block", width: 36, height: 4, background: "var(--border)", borderRadius: 2, overflow: "hidden", flexShrink: 0 }}>
-        <span style={{ display: "block", width: `${w}%`, height: "100%", background: color, borderRadius: 2 }} />
-      </span>
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+      {(better || worse) && (
+        <span style={{ fontSize: 9, fontWeight: 600, color: better ? "var(--green)" : "var(--red)" }} title="שינוי מול התקופה הקודמת (מספר נמוך = טוב יותר)">
+          {worse ? "▼" : "▲"}{Math.abs(diff).toFixed(1)}
+        </span>
+      )}
+      {num}
     </span>
   );
 }
@@ -1836,6 +1877,26 @@ function KeywordsPanel({ clientId, hasProperties, brandKeywords, activePeriod, o
 
   // Keywords in report list that don't appear in GSC results
   const manualOnlyKws = [...reportKws].filter(kw => !keywords.some(k => k.query === kw));
+
+  // Trend column labels/tooltips. The API compares each keyword to the previous
+  // and prior windows of the SAME length as the selected period — so the labels
+  // must track the period: "חודש קודם" only for the ~28-day preset, otherwise
+  // phrased in the period's own length.
+  const trendWin = (() => {
+    const DAY = 86_400_000;
+    const s = Date.parse(activePeriod.startDate), e = Date.parse(activePeriod.endDate);
+    const len = Math.round((e - s) / DAY) + 1;
+    const fmt = (ms: number) => new Date(ms).toLocaleDateString("he-IL", { day: "2-digit", month: "2-digit" });
+    const p1e = s - DAY, p1s = p1e - (len - 1) * DAY;
+    const p2e = p1s - DAY, p2s = p2e - (len - 1) * DAY;
+    const periodLabel = len <= 31 ? `${len} ימים` : `${Math.round(len / 30)} חודשים`;
+    return {
+      periodLabel,
+      curRange:   `${fmt(s)}–${fmt(e)}`,
+      prevLabel:  "תקופה קודמת",       prevRange:  `${fmt(p1s)}–${fmt(p1e)}`,
+      prev2Label: "שתי תקופות אחורה",  prev2Range: `${fmt(p2s)}–${fmt(p2e)}`,
+    };
+  })();
 
   if (!hasProperties) return null;
 
@@ -2036,12 +2097,12 @@ function KeywordsPanel({ clientId, hasProperties, brandKeywords, activePeriod, o
 
       {loaded && !loading && (
         <>
-          <div style={{ padding: "6px 20px 10px", fontSize: 12, color: "var(--text-faint)" }}>
-            מציג {visible.length} ביטויים מ-GSC
-            {brandKeywords.length > 0 && !showBrand && ` (ביטויי מותג מוסתרים)`}
+          <div style={{ padding: "6px 20px 10px", fontSize: 12, color: "var(--text-faint)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+            <span>מציג {visible.length} ביטויים מ-GSC</span>
+            <span>*תקופה = {trendWin.periodLabel}</span>
           </div>
           <div className="table-wrap">
-            <table className="tbl">
+            <table className="tbl kw-tbl">
               <thead>
                 <tr>
                   <th style={{ width: 36, textAlign: "center" }}>לדוח</th>
@@ -2049,7 +2110,18 @@ function KeywordsPanel({ clientId, hasProperties, brandKeywords, activePeriod, o
                   <th className="hidden-mobile" style={{ textAlign: "left" }}>קליקים</th>
                   <th className="hidden-mobile" style={{ textAlign: "left" }}>חשיפות</th>
                   <th className="hidden-mobile" style={{ textAlign: "left" }}>CTR</th>
-                  <th style={{ textAlign: "left" }}>מיקום</th>
+                  <th className="hidden-mobile" style={{ textAlign: "left" }}>
+                    {trendWin.prev2Label}
+                    <div style={{ fontSize: 10, fontWeight: 400, color: "var(--text-faint)", marginTop: 1 }}>{trendWin.prev2Range}</div>
+                  </th>
+                  <th className="hidden-mobile" style={{ textAlign: "left" }}>
+                    {trendWin.prevLabel}
+                    <div style={{ fontSize: 10, fontWeight: 400, color: "var(--text-faint)", marginTop: 1 }}>{trendWin.prevRange}</div>
+                  </th>
+                  <th style={{ textAlign: "left" }}>
+                    תקופה נוכחית
+                    <div style={{ fontSize: 10, fontWeight: 400, color: "var(--text-faint)", marginTop: 1 }}>{trendWin.curRange}</div>
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -2085,15 +2157,21 @@ function KeywordsPanel({ clientId, hasProperties, brandKeywords, activePeriod, o
                       <td className="hidden-mobile" style={{ color: "var(--text-muted)", fontSize: 12.5, textAlign: "left" }}>
                         {(k.ctr * 100).toFixed(2)}%
                       </td>
+                      <td className="hidden-mobile" style={{ textAlign: "left" }}>
+                        <PosCell pos={k.prev2Position} prev={null} />
+                      </td>
+                      <td className="hidden-mobile" style={{ textAlign: "left" }}>
+                        <PosCell pos={k.prevPosition} prev={k.prev2Position} />
+                      </td>
                       <td style={{ textAlign: "left" }}>
-                        <PosBar pos={k.position} />
+                        <PosCell pos={k.position} prev={k.prevPosition} />
                       </td>
                     </tr>
                   );
                 })}
                 {visible.length === 0 && (
                   <tr>
-                    <td colSpan={6} style={{ textAlign: "center", color: "var(--text-faint)", padding: "20px" }}>
+                    <td colSpan={8} style={{ textAlign: "center", color: "var(--text-faint)", padding: "20px" }}>
                       {search ? `לא נמצאו ביטויים עבור "${search}"` : "אין ביטויים"}
                     </td>
                   </tr>

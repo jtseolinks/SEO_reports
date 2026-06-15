@@ -10,6 +10,7 @@ import { generatePdf, buildReportFilename } from "@/lib/pdf-generator";
 import { sendReportEmail, getMonthName } from "@/lib/email";
 import { deleteReportFile } from "@/lib/report-storage";
 import { parseReportConfig } from "@/lib/report-config";
+import { effectiveSendDay, effectiveSendHour, parseDefaultSendDay } from "@/lib/schedule";
 
 type ClientResult = {
   agencyId: string;
@@ -78,19 +79,25 @@ export async function GET(request: NextRequest) {
       const agencyEmail = settings.contactEmail || process.env.AGENCY_EMAIL || "";
       const logoDataUrl = await resolveLogoDataUrl(settings.logoUrl);
 
-      // Active clients in THIS agency whose send day AND hour match now (Israel
-      // local) and that are not opted out. The cron runs hourly.
-      const clients = await prisma.client.findMany({
+      // Active, auto-send, non-excluded clients in THIS agency. The effective
+      // schedule is resolved in JS — non-custom clients follow the agency's
+      // global default day (live), custom clients use their own. The cron runs
+      // hourly; we keep only those whose effective day AND hour match now.
+      const defaultSendDay = parseDefaultSendDay(settings.defaultSendDay);
+      const candidates = await prisma.client.findMany({
         where: {
           agencyId: agency.id,
           status: "ACTIVE",
-          reportSendDay: today,
-          reportSendHour: nowHour,
           excludeFromReports: false,
           autoSend: true,
         },
         include: { googleProperties: true },
       });
+      const clients = candidates.filter(
+        (c) =>
+          effectiveSendDay(c, defaultSendDay) === today &&
+          effectiveSendHour(c) === nowHour,
+      );
 
       for (const client of clients) {
         if (!client.googleProperties) {

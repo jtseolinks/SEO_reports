@@ -26,14 +26,40 @@ export async function GET(request: NextRequest, { params }: Params) {
     const auth = await getAuthenticatedClient(ctx.agencyId);
     if (!auth) return NextResponse.json({ error: "Google not connected" }, { status: 400 });
 
+    // Two prior windows of the SAME length as the selected period, shifted back
+    // one and two windows — for the per-keyword position trend (prev month /
+    // 2 months ago when the period is ~1 month).
+    const DAY_MS = 86_400_000;
+    const shift = (iso: string, days: number) => {
+      const d = new Date(iso + "T00:00:00Z");
+      d.setUTCDate(d.getUTCDate() + days);
+      return d.toISOString().split("T")[0];
+    };
+    const winLen = Math.round((Date.parse(endDate) - Date.parse(startDate)) / DAY_MS) + 1;
+    const prev1End   = shift(startDate, -1);
+    const prev1Start = shift(prev1End, -(winLen - 1));
+    const prev2End   = shift(prev1Start, -1);
+    const prev2Start = shift(prev2End, -(winLen - 1));
+
+    const siteUrl = client.googleProperties.gscSiteUrl;
+
+    // Prior-window position lookups (query → position). Failures degrade
+    // gracefully to an empty map so the current period still renders.
+    const positionMap = async (s: string, e: string): Promise<Map<string, number>> => {
+      try {
+        const rows = await fetchGscSummary(auth, siteUrl, s, e, ["query"]);
+        return new Map(rows.filter(r => r.query).map(r => [r.query!, r.position]));
+      } catch {
+        return new Map();
+      }
+    };
+
     try {
-      const rows = await fetchGscSummary(
-        auth,
-        client.googleProperties.gscSiteUrl,
-        startDate,
-        endDate,
-        ["query"]
-      );
+      const [rows, prev1Map, prev2Map] = await Promise.all([
+        fetchGscSummary(auth, siteUrl, startDate, endDate, ["query"]),
+        positionMap(prev1Start, prev1End),
+        positionMap(prev2Start, prev2End),
+      ]);
 
       const keywords = rows
         .filter(r => r.query)
@@ -45,6 +71,8 @@ export async function GET(request: NextRequest, { params }: Params) {
           impressions: r.impressions,
           ctr: r.ctr,
           position: r.position,
+          prevPosition:  prev1Map.get(r.query!) ?? null,
+          prev2Position: prev2Map.get(r.query!) ?? null,
         }));
 
       return NextResponse.json({ keywords });

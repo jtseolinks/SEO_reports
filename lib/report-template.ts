@@ -144,11 +144,37 @@ function posBar(pos: number): string {
   </span>`;
 }
 
-function changeCell(change: number): string {
-  if (!change) return `<span style="color:#9ca3af">—</span>`;
-  const isPos = change > 0;
-  const color = isPos ? "#16a34a" : "#dc2626";
-  return `<span style="color:${color};font-weight:600;font-size:11px">${isPos ? "↑" : "↓"} ${Math.abs(change).toFixed(1)}</span>`;
+// Position cell with a trend indicator vs the prior (older) period — mirrors the
+// admin keyword panel. Lower rank number = better; the arrow points the way the
+// site moved in Google: climbed = green ▲ (number fell), dropped = red ▼ (number
+// rose). `prev` 0 → number only.
+function posTrendCell(pos: number, prev: number): string {
+  if (!pos || pos === 0) return `<span style="color:#9ca3af">—</span>`;
+  const color = pos <= 3 ? "#16a34a" : pos <= 10 ? "#1E2D7D" : pos <= 20 ? "#d97706" : "#9ca3af";
+  const num = `<span style="font-weight:700;color:${color};font-size:13px">${pos.toFixed(1)}</span>`;
+  if (!prev || prev === 0) return num;
+  const diff = pos - prev;
+  const worse = diff > 0.05, better = diff < -0.05;
+  if (!worse && !better) return num;
+  const dColor = better ? "#16a34a" : "#dc2626";
+  // num first, delta second, in an LTR row → the change sits to the RIGHT of the
+  // position number, matching the admin keyword panel.
+  return `<span style="display:inline-flex;align-items:center;gap:4px;direction:ltr">
+    ${num}
+    <span style="font-size:9px;font-weight:600;color:${dColor}">${worse ? "▼" : "▲"}${Math.abs(diff).toFixed(1)}</span>
+  </span>`;
+}
+
+// "dd.mm–dd.mm" range for a report period — shown under the position column
+// headers, mirroring the admin keyword panel.
+function dateRange(p: { startDate: string; endDate: string }): string {
+  const f = (iso: string) => { const [, m, d] = iso.split("-"); return `${d}.${m}`; };
+  return `${f(p.startDate)}–${f(p.endDate)}`;
+}
+
+// Small faint sub-line under a header (the period date range).
+function thDate(range: string): string {
+  return `<div style="font-size:9px;font-weight:400;color:#9ca3af;margin-top:1px">${range}</div>`;
 }
 
 // ── section header ────────────────────────────────────────────────────────────
@@ -221,9 +247,12 @@ export function generateReportHtml(data: ReportData, agencyName: string, agencyE
   const keywordRows = data.keywords.map((kw, i) => `
     <tr style="${i % 2 === 0 ? "" : "background:#fafafa"}">
       <td style="padding:9px 14px;font-size:12.5px;color:#1f2937;font-weight:500;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(kw.keyword)}</td>
-      <td style="padding:9px 14px;text-align:left">${posBar(kw.position)}</td>
+      <td style="padding:9px 14px;text-align:left;font-size:12px;font-weight:600;color:#111827;font-variant-numeric:tabular-nums">${fmtBig(kw.clicks)}</td>
+      <td style="padding:9px 14px;text-align:left;font-size:12px;color:#374151;font-variant-numeric:tabular-nums">${fmtBig(kw.impressions)}</td>
       <td style="padding:9px 14px;text-align:left;font-size:12px;color:#374151">${fmtPct(kw.ctr, 2)}</td>
-      <td style="padding:9px 14px;text-align:left">${changeCell(kw.change)}</td>
+      <td style="padding:9px 14px;text-align:left">${posTrendCell(kw.prev2Position, 0)}</td>
+      <td style="padding:9px 14px;text-align:left">${posTrendCell(kw.prevPosition, kw.prev2Position)}</td>
+      <td style="padding:9px 14px;text-align:left">${posTrendCell(kw.position, kw.prevPosition)}</td>
     </tr>`).join("");
 
   // ── section 04: Top Pages ─────────────────────────────────────────────────
@@ -274,7 +303,7 @@ export function generateReportHtml(data: ReportData, agencyName: string, agencyE
     .section { page-break-inside: avoid; }
   }
   table { border-collapse: collapse; width: 100%; }
-  th { background: #F8F9FB; font-size: 11px; font-weight: 600; color: #6b7280; padding: 9px 14px; text-align: right; border-bottom: 1.5px solid #E8EAEE; }
+  th { background: #F8F9FB; font-size: 11px; font-weight: 600; color: #6b7280; padding: 9px 14px; text-align: right; border-bottom: 1.5px solid #E8EAEE; vertical-align: top; }
   th.num { text-align: left; }
 </style>
 </head>
@@ -356,12 +385,15 @@ export function generateReportHtml(data: ReportData, agencyName: string, agencyE
           <thead>
             <tr>
               <th>ביטוי</th>
-              <th class="num">פוזיציה</th>
+              <th class="num">קליקים</th>
+              <th class="num">חשיפות</th>
               <th class="num">CTR</th>
-              <th class="num">שינוי</th>
+              <th class="num">שתי תקופות אחורה${thDate(dateRange(data.comparisonPeriod2))}</th>
+              <th class="num">תקופה קודמת${thDate(dateRange(data.comparisonPeriod))}</th>
+              <th class="num">תקופה נוכחית${thDate(dateRange(data.period))}</th>
             </tr>
           </thead>
-          <tbody>${keywordRows || `<tr><td colspan="4" style="padding:20px;text-align:center;color:#9ca3af;font-size:12px">לא הוגדרו ביטויים מעוקבים ללקוח זה</td></tr>`}</tbody>
+          <tbody>${keywordRows || `<tr><td colspan="7" style="padding:20px;text-align:center;color:#9ca3af;font-size:12px">לא הוגדרו ביטויים מעוקבים ללקוח זה</td></tr>`}</tbody>
         </table>
       </div>
     </div>` : ""}

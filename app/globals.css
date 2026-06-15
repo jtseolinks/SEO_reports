@@ -621,6 +621,21 @@
 .tbl .client-cell .url { font-size: 12px; color: var(--text-muted); }
 .tbl .muted { color: var(--text-muted); }
 
+/* Keyword table (client detail) — many columns. Fill the container width; the
+   query column is capped (max-width:260 inline) so leftover space spreads
+   across the metric columns instead of opening one big gap or leaving an empty
+   strip on the side. */
+.kw-tbl { width: 100%; }
+/* Top-align every header so single-line labels sit at the same height as the
+   two-line ones (label + date range), keeping the header row flush. */
+.kw-tbl thead th { vertical-align: top; }
+.kw-tbl thead th,
+.kw-tbl tbody td { padding-inline: 12px; }
+.kw-tbl thead th:first-child,
+.kw-tbl tbody td:first-child { padding-inline-start: 14px; }
+.kw-tbl thead th:last-child,
+.kw-tbl tbody td:last-child { padding-inline-end: 14px; }
+
 /* ============ Filter tabs ============ */
 .tabs {
   display: flex;

@@ -38,6 +38,11 @@ export function buildFakeReportData(): ReportData {
       endDate: `${y}-${String(m - 1).padStart(2, "0")}-28`,
       label: compLabel,
     },
+    comparisonPeriod2: {
+      startDate: `${y}-${String(m - 2).padStart(2, "0")}-01`,
+      endDate: `${y}-${String(m - 2).padStart(2, "0")}-28`,
+      label: compLabel,
+    },
     gsc: {
       clicks: mc(2847, 2310),
       impressions: mc(41200, 38500),
@@ -94,12 +99,12 @@ export function buildFakeReportData(): ReportData {
       ],
     },
     keywords: [
-      { keyword: "rankey", isBrand: true, clicks: 540, impressions: 1200, ctr: 45.0, position: 1.2, prevPosition: 1.3, change: 0.1 },
-      { keyword: "rankey seo", isBrand: true, clicks: 210, impressions: 480, ctr: 43.8, position: 1.4, prevPosition: 1.6, change: 0.2 },
-      { keyword: "seo services", isBrand: false, clicks: 320, impressions: 4200, ctr: 7.6, position: 3.1, prevPosition: 4.2, change: 1.1 },
-      { keyword: "seo agency", isBrand: false, clicks: 210, impressions: 5800, ctr: 3.6, position: 7.4, prevPosition: 8.9, change: 1.5 },
-      { keyword: "technical seo", isBrand: false, clicks: 122, impressions: 2200, ctr: 5.5, position: 6.3, prevPosition: 5.8, change: -0.5 },
-      { keyword: "local seo", isBrand: false, clicks: 160, impressions: 2900, ctr: 5.5, position: 4.8, prevPosition: 6.1, change: 1.3 },
+      { keyword: "rankey", isBrand: true, clicks: 540, impressions: 1200, ctr: 45.0, position: 1.2, prevPosition: 1.3, prev2Position: 1.5, change: 0.1 },
+      { keyword: "rankey seo", isBrand: true, clicks: 210, impressions: 480, ctr: 43.8, position: 1.4, prevPosition: 1.6, prev2Position: 1.8, change: 0.2 },
+      { keyword: "seo services", isBrand: false, clicks: 320, impressions: 4200, ctr: 7.6, position: 3.1, prevPosition: 4.2, prev2Position: 5.5, change: 1.1 },
+      { keyword: "seo agency", isBrand: false, clicks: 210, impressions: 5800, ctr: 3.6, position: 7.4, prevPosition: 8.9, prev2Position: 10.2, change: 1.5 },
+      { keyword: "technical seo", isBrand: false, clicks: 122, impressions: 2200, ctr: 5.5, position: 6.3, prevPosition: 5.8, prev2Position: 5.0, change: -0.5 },
+      { keyword: "local seo", isBrand: false, clicks: 160, impressions: 2900, ctr: 5.5, position: 4.8, prevPosition: 6.1, prev2Position: 7.0, change: 1.3 },
     ],
     trackedKeywords: [
       { keyword: "rankey", matchType: "EXACT", isBrand: true },
