@@ -15,7 +15,7 @@ import { effectiveSendDay, parseDefaultSendDay } from "@/lib/schedule";
 // ── helpers ──────────────────────────────────────────────────────────────────
 
 function fmtDate(d: Date | string | null) {
-  if (!d) return "—";
+  if (!d) return "-";
   return new Date(d).toLocaleDateString("he-IL", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
@@ -38,7 +38,7 @@ function ClientAvatar({ name }: { name: string }) {
 
 function Sparkline({ values, color }: { values: number[]; color?: string }) {
   if (!values.length || values.every(v => v === 0)) {
-    return <span style={{ color: "var(--text-faint)", fontSize: 11 }}>—</span>;
+    return <span style={{ color: "var(--text-faint)", fontSize: 11 }}>-</span>;
   }
   const w = 72, h = 28;
   const max = Math.max(...values);
@@ -148,7 +148,7 @@ async function getDashboardData(agencyId: string) {
   const coveredCount   = sentCount + generatedCount;
   const coveragePct    = totalClients > 0 ? Math.round((coveredCount / totalClients) * 100) : 0;
 
-  // Next scheduled report run (generation + send) across eligible clients —
+  // Next scheduled report run (generation + send) across eligible clients -
   // the nearest upcoming send day among active, auto-send, non-excluded clients.
   const nextSendDate = (sendDay: number): Date => {
     let dd = new Date(now.getFullYear(), now.getMonth(), sendDay);
@@ -300,7 +300,7 @@ export default async function AdminPage() {
         </div>
       </div>
 
-      {/* Schedule — next report run across clients */}
+      {/* Schedule - next report run across clients */}
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="card-head">
           <div>
@@ -332,7 +332,7 @@ export default async function AdminPage() {
             </div>
           ) : (
             <div style={{ fontSize: 13, color: "var(--text-muted)" }}>
-              אין שליחה אוטומטית מתוזמנת — כל הלקוחות בשליחה ידנית או מוחרגים.
+              אין שליחה אוטומטית מתוזמנת - כל הלקוחות בשליחה ידנית או מוחרגים.
             </div>
           )}
         </div>
@@ -393,7 +393,7 @@ export default async function AdminPage() {
         </div>
       </div>
 
-      {/* Client status table — client component with live refresh */}
+      {/* Client status table - client component with live refresh */}
       <DashboardClientsTable clients={clientRows} />
     </div>
   );

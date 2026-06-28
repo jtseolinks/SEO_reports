@@ -73,7 +73,7 @@
   --brand-cyan: #5BC2F0;
   --brand-cyan-soft: #E8F6FD;
 
-  /* Accent — navy is the CTA/interactive color */
+  /* Accent - navy is the CTA/interactive color */
   --accent: #1E2D7D;
   --accent-hover: #14215F;
   --accent-soft: #EEF0F9;
@@ -621,7 +621,7 @@
 .tbl .client-cell .url { font-size: 12px; color: var(--text-muted); }
 .tbl .muted { color: var(--text-muted); }
 
-/* Keyword table (client detail) — many columns. Fill the container width; the
+/* Keyword table (client detail) - many columns. Fill the container width; the
    query column is capped (max-width:260 inline) so leftover space spreads
    across the metric columns instead of opening one big gap or leaving an empty
    strip on the side. */

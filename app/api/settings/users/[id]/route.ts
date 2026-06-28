@@ -69,7 +69,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     });
     if (!membership) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-    // Role change rules — only OWNER can promote/demote.
+    // Role change rules - only OWNER can promote/demote.
     const newRole =
       role === "OWNER" || role === "ADMIN" || role === "MEMBER"
         ? (role as MembershipRole)
@@ -86,7 +86,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         });
         if (ownerCount <= 1) {
           return NextResponse.json(
-            { error: "לא ניתן לשנות תפקיד הבעלים האחרון — העבר בעלות תחילה" },
+            { error: "לא ניתן לשנות תפקיד הבעלים האחרון - העבר בעלות תחילה" },
             { status: 400 }
           );
         }

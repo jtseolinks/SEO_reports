@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
   const fwd = req.headers.get("x-forwarded-for") ?? "";
   const ip = fwd.split(",")[0].trim() || "unknown";
   if (!checkRateLimit(ip)) {
-    return NextResponse.json({ error: "יותר מדי ניסיונות — אנא המתן שעה ונסה שוב" }, { status: 429 });
+    return NextResponse.json({ error: "יותר מדי ניסיונות - אנא המתן שעה ונסה שוב" }, { status: 429 });
   }
 
   let body: { agencyName?: string; name?: string; email?: string; password?: string };

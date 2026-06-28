@@ -4,7 +4,7 @@ import { encrypt, decrypt } from "./crypto";
 // Platform-wide settings: a single, non-tenant-scoped key/value store. Currently
 // holds the shared SMTP transport used for every outgoing email. Managed only by
 // super-admins (see app/api/super-admin/smtp). Mirrors agency-settings.ts but
-// without an agencyId dimension — there is exactly one platform config.
+// without an agencyId dimension - there is exactly one platform config.
 
 const SECRET_KEYS: (keyof PlatformSettings)[] = ["smtpPass"];
 
@@ -47,7 +47,7 @@ function defaults(): PlatformSettings {
 }
 
 // Returns settings with secrets DECRYPTED (real values), for server-side use such
-// as building the SMTP transport. Never hand this to the client — use maskSecrets.
+// as building the SMTP transport. Never hand this to the client - use maskSecrets.
 export async function getPlatformSettings(): Promise<PlatformSettings> {
   const rows = await prisma.platformSetting.findMany({ where: { key: { in: KEYS } } });
   const map  = Object.fromEntries(rows.map(r => [r.key, r.value]));

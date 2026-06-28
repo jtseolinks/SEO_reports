@@ -1,12 +1,12 @@
 type HashMarkProps = {
   /** Rendered width/height in px. */
   size?: number;
-  /** Fill color — accepts any CSS color value, including CSS variables. */
+  /** Fill color - accepts any CSS color value, including CSS variables. */
   color?: string;
 };
 
 /**
- * The Rankey "#" brand mark — bold and italic with flat-cut ends, matching the
+ * The Rankey "#" brand mark - bold and italic with flat-cut ends, matching the
  * company logo glyph. Drawn as four filled, sheared parallelograms (not a font
  * glyph) so it is perfectly centered at any size and renders identically
  * everywhere (sidebar, login, favicon). Centered on a 24×24 viewBox at (12, 12).

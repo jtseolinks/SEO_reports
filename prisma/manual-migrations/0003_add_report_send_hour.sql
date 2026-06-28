@@ -4,7 +4,7 @@
 -- previous hard-coded behavior.
 --
 -- Run:  npx tsx prisma/manual-migrations/run.ts 0003_add_report_send_hour.sql --confirm
--- Shared Neon DB — run ONCE. Take a snapshot first.
+-- Shared Neon DB - run ONCE. Take a snapshot first.
 
 BEGIN;
 

@@ -2,15 +2,15 @@
  * Seed brand-keyword exclusions for all clients.
  *
  * For each client adds two terms (skips duplicates & blanks):
- *   1. The client's display name — covers Hebrew / mixed names
- *   2. The domain root  — covers English / Latin brand references
+ *   1. The client's display name - covers Hebrew / mixed names
+ *   2. The domain root  - covers English / Latin brand references
  *      e.g. "znk.co.il" → "znk"  |  "correct-gifts.com" → "correct gifts"
  *
  * matchType defaults to CONTAINS in the schema, so any query that
  * includes the term (case-insensitive, regex) will be excluded.
  *
  * Run: npx tsx scripts/seed-brand-keywords.ts
- * Safe to re-run — skips already-existing keywords via skipDuplicates.
+ * Safe to re-run - skips already-existing keywords via skipDuplicates.
  */
 import { PrismaClient } from "../lib/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
@@ -49,13 +49,13 @@ async function main() {
   for (const client of clients) {
     const root = domainRoot(client.domain);
 
-    // Collect candidate terms — skip blanks and single-char tokens
+    // Collect candidate terms - skip blanks and single-char tokens
     const candidates = dedup(
       [client.name, root].filter(t => t.length > 1)
     );
 
     if (candidates.length === 0) {
-      console.log(`  [skip] ${client.name} — no usable terms`);
+      console.log(`  [skip] ${client.name} - no usable terms`);
       skipped++;
       continue;
     }
@@ -70,7 +70,7 @@ async function main() {
     const toInsert = candidates.filter(t => !existingSet.has(t.toLowerCase()));
 
     if (toInsert.length === 0) {
-      console.log(`  [skip] ${client.name} — brand keywords already set: ${candidates.join(", ")}`);
+      console.log(`  [skip] ${client.name} - brand keywords already set: ${candidates.join(", ")}`);
       skipped++;
       continue;
     }

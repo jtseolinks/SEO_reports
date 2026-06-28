@@ -60,18 +60,18 @@ function changeBadge(m: ReportMetricChange, lowerIsBetter = false): string {
 
 function kpiCard(label: string, value: string, sub: string, m: ReportMetricChange, lowerIsBetter = false, prevValue = ""): string {
   return `
-  <div style="flex:1;background:#F8F9FB;border:1.5px solid #E8EAEE;border-radius:12px;padding:18px 20px;">
+  <div style="flex:1;display:flex;flex-direction:column;background:#F8F9FB;border:1.5px solid #E8EAEE;border-radius:12px;padding:18px 20px;">
     <div style="font-size:11px;color:#6b7280;font-weight:500;margin-bottom:4px">${label}</div>
     <div style="font-size:28px;font-weight:800;color:#111827;letter-spacing:-0.03em;line-height:1.1">${value}</div>
     ${sub ? `<div style="font-size:11px;color:#9ca3af;margin-top:2px">${sub}</div>` : ""}
     ${prevValue ? `<div style="font-size:11px;color:#9ca3af;margin-top:8px;padding-top:8px;border-top:1px solid #EEF0F3">תקופה קודמת: <span style="font-weight:700;color:#6b7280">${prevValue}</span></div>` : ""}
-    <div style="margin-top:10px">${changeBadge(m, lowerIsBetter)}</div>
+    <div style="margin-top:auto;padding-top:10px">${changeBadge(m, lowerIsBetter)}</div>
   </div>`;
 }
 
 // ── SVG trend chart ───────────────────────────────────────────────────────────
 
-// Dual-line clicks + impressions chart — mirrors the live GSC panel on the admin
+// Dual-line clicks + impressions chart - mirrors the live GSC panel on the admin
 // client dashboard (DualLineChart). Clicks (blue, left axis) over impressions
 // (purple, right axis), with a legend showing the period totals.
 function trendChart(
@@ -157,7 +157,7 @@ function trendChart(
 // ── position bar ──────────────────────────────────────────────────────────────
 
 function posBar(pos: number): string {
-  if (!pos || pos === 0) return `<span style="color:#9ca3af">—</span>`;
+  if (!pos || pos === 0) return `<span style="color:#9ca3af">-</span>`;
   const color = pos <= 3 ? "#16a34a" : pos <= 10 ? "#1E2D7D" : pos <= 20 ? "#d97706" : "#9ca3af";
   const barW = Math.max(4, Math.min(100, Math.round(100 - (pos / 100) * 88)));
   return `<span style="display:inline-flex;align-items:center;gap:5px;direction:ltr">
@@ -168,12 +168,12 @@ function posBar(pos: number): string {
   </span>`;
 }
 
-// Position cell with a trend indicator vs the prior (older) period — mirrors the
+// Position cell with a trend indicator vs the prior (older) period - mirrors the
 // admin keyword panel. Lower rank number = better; the arrow points the way the
 // site moved in Google: climbed = green ▲ (number fell), dropped = red ▼ (number
 // rose). `prev` 0 → number only.
 function posTrendCell(pos: number, prev: number): string {
-  if (!pos || pos === 0) return `<span style="color:#9ca3af">—</span>`;
+  if (!pos || pos === 0) return `<span style="color:#9ca3af">-</span>`;
   const color = pos <= 3 ? "#16a34a" : pos <= 10 ? "#1E2D7D" : pos <= 20 ? "#d97706" : "#9ca3af";
   const num = `<span style="font-weight:700;color:${color};font-size:13px">${pos.toFixed(1)}</span>`;
   if (!prev || prev === 0) return num;
@@ -189,7 +189,7 @@ function posTrendCell(pos: number, prev: number): string {
   </span>`;
 }
 
-// "dd.mm–dd.mm" range for a report period — shown under the position column
+// "dd.mm–dd.mm" range for a report period - shown under the position column
 // headers, mirroring the admin keyword panel.
 function dateRange(p: { startDate: string; endDate: string }): string {
   const f = (iso: string) => { const [, m, d] = iso.split("-"); return `${d}.${m}`; };
@@ -300,7 +300,7 @@ export function generateReportHtml(data: ReportData, agencyName: string, agencyE
     <tr style="${i % 2 === 0 ? "" : "background:#fafafa"}">
       <td style="padding:9px 14px;font-size:11.5px;color:#4b5563;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:monospace">${esc(urlDisplay)}</td>
       <td style="padding:9px 14px;text-align:left;font-size:12px;font-weight:600;color:#111827">${fmtBig(p.sessions)}</td>
-      <td style="padding:9px 14px;text-align:left;font-size:12px;color:#374151">${p.keyEvents > 0 ? fmtBig(p.keyEvents) : "—"}</td>
+      <td style="padding:9px 14px;text-align:left;font-size:12px;color:#374151">${p.keyEvents > 0 ? fmtBig(p.keyEvents) : "-"}</td>
     </tr>`;
   }).join("");
 

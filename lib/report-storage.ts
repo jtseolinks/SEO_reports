@@ -49,6 +49,6 @@ export async function deleteReportFile(pdfUrl: string): Promise<void> {
   try {
     await fs.unlink(reportFilePathFromUrl(pdfUrl));
   } catch {
-    // File already gone or never existed — nothing to do.
+    // File already gone or never existed - nothing to do.
   }
 }

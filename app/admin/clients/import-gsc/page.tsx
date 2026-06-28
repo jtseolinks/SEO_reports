@@ -185,7 +185,7 @@ export default function ImportGscPage() {
         <div>
           <h1 className="text-2xl font-semibold">Import from GSC + GA4</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            All sites from your GSC account — GA4 matched automatically by name
+            All sites from your GSC account - GA4 matched automatically by name
           </p>
         </div>
       </div>
@@ -289,7 +289,7 @@ export default function ImportGscPage() {
                         disabled={!row.selected || row.alreadyImported}
                         className="border rounded px-2 py-1 text-sm w-full max-w-[260px] bg-background disabled:opacity-50"
                       >
-                        <option value="">— No GA4 —</option>
+                        <option value="">- No GA4 -</option>
                         {ga4Properties.map((p) => (
                           <option key={p.propertyId} value={p.propertyId}>
                             {p.displayName} ({p.propertyId})

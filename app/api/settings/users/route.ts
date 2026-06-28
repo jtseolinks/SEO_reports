@@ -63,7 +63,7 @@ export async function GET() {
   }
 }
 
-// Invite a new member — sends setup email, no password needed.
+// Invite a new member - sends setup email, no password needed.
 export async function POST(req: NextRequest) {
   try {
     const ctx = await requireAgencyAdmin();

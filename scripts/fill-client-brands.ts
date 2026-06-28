@@ -96,7 +96,7 @@ async function main() {
     }
     console.log(`\n✔ Updated ${n} client(s) + synced auto-brand keywords.`);
   } else {
-    console.log(`\n(dry-run — no writes. Re-run with --apply to commit.)`);
+    console.log(`\n(dry-run - no writes. Re-run with --apply to commit.)`);
   }
   process.exit(0);
 }

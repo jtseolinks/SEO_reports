@@ -28,7 +28,7 @@ export default async function GooglePage({
         <div>
           <h1 className="page-title">אינטגרציות</h1>
           <p className="page-sub">
-            חיבור חד-פעמי לחשבון Google שלך — ממנו המערכת שואבת את הנתונים של כל הלקוחות
+            חיבור חד-פעמי לחשבון Google שלך - ממנו המערכת שואבת את הנתונים של כל הלקוחות
           </p>
         </div>
       </div>

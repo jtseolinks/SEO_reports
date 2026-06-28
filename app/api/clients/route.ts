@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
   }
 
   // New clients follow the agency's global default send day unless an explicit,
-  // different day is requested — in which case it's a per-client override.
+  // different day is requested - in which case it's a per-client override.
   const defaultSendDay = parseDefaultSendDay((await getAgencySettings(ctx.agencyId)).defaultSendDay);
   const requestedDay = reportSendDay != null ? parseInt(String(reportSendDay), 10) : null;
   const isCustomDay = requestedDay != null && !isNaN(requestedDay) && requestedDay !== defaultSendDay;

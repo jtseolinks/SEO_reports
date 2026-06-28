@@ -104,7 +104,7 @@ export async function GET() {
   }
 }
 
-// Create a new agency with an owner — sends onboarding email with setup wizard link.
+// Create a new agency with an owner - sends onboarding email with setup wizard link.
 export async function POST(req: NextRequest) {
   try {
     await requireSuperAdmin();
@@ -132,7 +132,7 @@ export async function POST(req: NextRequest) {
           data: {
             email: emailLower,
             name: ownerName?.trim() || null,
-            // passwordHash intentionally null — must be set via onboarding
+            // passwordHash intentionally null - must be set via onboarding
           },
         });
       }
@@ -150,12 +150,12 @@ export async function POST(req: NextRequest) {
       return { agency, userId: owner.id };
     });
 
-    // Generate setup token — isAgencySetup=true → founding owner gets full wizard
+    // Generate setup token - isAgencySetup=true → founding owner gets full wizard
     const rawToken = await createSetupToken(userId, agency.id, { isAgencySetup: true });
     const baseUrl = (process.env.NEXTAUTH_URL || process.env.APP_URL || "").replace(/\/$/, "");
     const setupUrl = `${baseUrl}/onboard/${rawToken}`;
 
-    // Attempt to send onboarding email — non-fatal
+    // Attempt to send onboarding email - non-fatal
     let emailSent = false;
     let emailError = "";
     try {

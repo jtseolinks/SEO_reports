@@ -74,7 +74,7 @@ export async function requireAgencyOwner(): Promise<AgencyContext> {
 export type SuperAdminContext = { userId: string; email: string };
 
 /**
- * Requires the isSuperAdmin flag — cross-agency platform admin.
+ * Requires the isSuperAdmin flag - cross-agency platform admin.
  * Independent of agency membership; the user may have no active agency.
  */
 export async function requireSuperAdmin(): Promise<SuperAdminContext> {
@@ -86,8 +86,8 @@ export async function requireSuperAdmin(): Promise<SuperAdminContext> {
 
 /**
  * Load a client by id ONLY if it belongs to the given agency. Uses findFirst
- * (not findUnique) so agencyId can be part of the filter, and returns 404 — not
- * 403 — so a client's existence is never leaked across tenants.
+ * (not findUnique) so agencyId can be part of the filter, and returns 404 - not
+ * 403 - so a client's existence is never leaked across tenants.
  */
 export async function requireClientInAgency<
   T extends Prisma.ClientInclude | undefined = undefined

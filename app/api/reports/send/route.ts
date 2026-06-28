@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
       data: { status: "SENT", sentAt: new Date(), emailTo: client.contactEmail, emailCc: client.ccEmails, pdfUrl: null },
     });
 
-    // Report delivered — the PDF content is no longer needed on disk.
+    // Report delivered - the PDF content is no longer needed on disk.
     await deleteReportFile(report.pdfUrl);
   } catch (err) {
     sendStatus = "failed";

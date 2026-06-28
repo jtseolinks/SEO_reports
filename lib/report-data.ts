@@ -22,7 +22,7 @@ export function getReportPeriods(reportMonth: string): {
   const prevStart = new Date(year, month - 2, 1);
   const prevEnd = new Date(year, month - 1, 0);
 
-  // Two months before the report month — for the per-keyword position trend.
+  // Two months before the report month - for the per-keyword position trend.
   const prev2Start = new Date(year, month - 3, 1);
   const prev2End = new Date(year, month - 2, 0);
 
@@ -154,7 +154,7 @@ export async function buildReportData(
   const totalImp = aggCurrent.impressions || 1;
   const totalImpPrev = aggPrevious.impressions || 1;
 
-  // Non-brand filter — excludes any query that contains a brand keyword
+  // Non-brand filter - excludes any query that contains a brand keyword
   const brandTerms = client.keywords
     .filter((k) => k.isBrand)
     .map((k) => k.keyword.toLowerCase());
@@ -206,7 +206,7 @@ export async function buildReportData(
     .sort((a, b) => b.impressions - a.impressions)
     .slice(0, 10);
 
-  // Tracked keyword performance — the keywords explicitly chosen for the report.
+  // Tracked keyword performance - the keywords explicitly chosen for the report.
   const chosenKeywords = client.keywords.map((kw) => {
     const matchFn = kw.matchType === "EXACT"
       ? (q: string) => q === kw.keyword
@@ -246,7 +246,7 @@ export async function buildReportData(
 
   // Default behaviour: if NO non-brand keyword was chosen for the report
   // (neither by marking a GSC query nor by adding one manually), fall back to
-  // the full general keyword list shown on the client page — every non-brand
+  // the full general keyword list shown on the client page - every non-brand
   // GSC query for the period (same 100-row cap as the page), sorted by clicks.
   const hasChosenKeywords = chosenKeywords.some((k) => !k.isBrand);
   const keywords = hasChosenKeywords

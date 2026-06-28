@@ -32,7 +32,7 @@ export function AcceptForm({ token, agencyName, email, role, userExists }: Props
 
   async function handleAccept() {
     setError("");
-    // New users set a password here — enforce the shared strength policy.
+    // New users set a password here - enforce the shared strength policy.
     if (!userExists) {
       const pwErr = validatePassword(password);
       if (pwErr) { setError(pwErr); return; }

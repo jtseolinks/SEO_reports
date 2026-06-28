@@ -209,7 +209,7 @@ export function UsersClient({ currentUserRole, currentUserId }: Props) {
               <div style={{ padding: "10px 12px", background: "#fff7ed",
                 border: "1px solid #fed7aa", borderRadius: "var(--r-md)", fontSize: 12 }}>
                 <p style={{ margin: "0 0 6px", fontWeight: 600, color: "#92400e" }}>
-                  שליחת המייל נכשלה — שתף ידנית:
+                  שליחת המייל נכשלה - שתף ידנית:
                 </p>
                 <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                   <span style={{ flex: 1, fontFamily: "monospace", direction: "ltr",
@@ -382,9 +382,9 @@ export function UsersClient({ currentUserRole, currentUserId }: Props) {
 
       {/* Legend */}
       <div style={{ fontSize: 11, color: "var(--text-faint)", display: "flex", gap: 16, flexWrap: "wrap" }}>
-        <span><strong>בעלים</strong> — שליטה מלאה, ניהול הרשאות</span>
-        <span><strong>מנהל</strong> — עריכת לקוחות ודוחות, הוספת חברי צוות</span>
-        <span><strong>חבר צוות</strong> — צפייה בלבד</span>
+        <span><strong>בעלים</strong> - שליטה מלאה, ניהול הרשאות</span>
+        <span><strong>מנהל</strong> - עריכת לקוחות ודוחות, הוספת חברי צוות</span>
+        <span><strong>חבר צוות</strong> - צפייה בלבד</span>
       </div>
     </div>
   );

@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS "PlatformSetting" (
 );
 
 -- Backfill the SMTP credentials from the latest agency that has them. smtpPass is
--- copied verbatim — it is encrypted with the shared key, and platform-settings.ts
+-- copied verbatim - it is encrypted with the shared key, and platform-settings.ts
 -- decrypts it the same way agency-settings did.
 WITH latest AS (
   SELECT s."agencyId"

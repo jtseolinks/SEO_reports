@@ -26,7 +26,7 @@ function getPreviousMonth(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
-// Current day-of-month and hour in Israel time — auto-send schedules are local.
+// Current day-of-month and hour in Israel time - auto-send schedules are local.
 function nowInIsrael(): { day: number; hour: number } {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: "Asia/Jerusalem", day: "2-digit", hour: "2-digit", hour12: false,
@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
   const results: ClientResult[] = [];
   const agencyErrors: { agencyId: string; error: string }[] = [];
 
-  // No user session here — iterate every agency explicitly and pass its id to
+  // No user session here - iterate every agency explicitly and pass its id to
   // all scoped helpers. A failure in one agency must not abort the others.
   const agencies = await getAllAgencies();
 
@@ -80,7 +80,7 @@ export async function GET(request: NextRequest) {
       const logoDataUrl = await resolveLogoDataUrl(settings.logoUrl);
 
       // Active, auto-send, non-excluded clients in THIS agency. The effective
-      // schedule is resolved in JS — non-custom clients follow the agency's
+      // schedule is resolved in JS - non-custom clients follow the agency's
       // global default day (live), custom clients use their own. The cron runs
       // hourly; we keep only those whose effective day AND hour match now.
       const defaultSendDay = parseDefaultSendDay(settings.defaultSendDay);
@@ -119,7 +119,7 @@ export async function GET(request: NextRequest) {
             where: { clientId_reportMonth: { clientId: client.id, reportMonth } },
           });
 
-          // Already delivered this month — never resend (guards hourly re-runs).
+          // Already delivered this month - never resend (guards hourly re-runs).
           if (existingReport?.status === "SENT") {
             results.push({
               agencyId: agency.id,
@@ -131,7 +131,7 @@ export async function GET(request: NextRequest) {
             continue;
           }
 
-          // Always (re)generate a fresh report with the latest data — ignore any
+          // Always (re)generate a fresh report with the latest data - ignore any
           // existing DRAFT/GENERATED report (e.g. one created manually earlier).
           const report = await prisma.monthlyReport.upsert({
             where: { clientId_reportMonth: { clientId: client.id, reportMonth } },
@@ -242,7 +242,7 @@ export async function GET(request: NextRequest) {
         }
       }
     } catch (err) {
-      // Agency-level failure (e.g. settings/Google) — isolate to this agency.
+      // Agency-level failure (e.g. settings/Google) - isolate to this agency.
       const errorMessage = err instanceof Error ? err.message : String(err);
       console.error(`Cron: agency ${agency.id} failed:`, err);
       agencyErrors.push({ agencyId: agency.id, error: errorMessage });

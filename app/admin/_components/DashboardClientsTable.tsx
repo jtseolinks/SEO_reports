@@ -337,7 +337,7 @@ export function DashboardClientsTable({ clients }: { clients: DashClientRow[] })
                       ? <span style={{ color: "var(--text-faint)" }}>…</span>
                       : clicks > 0
                         ? <span style={{ fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{fmtNum(clicks)}</span>
-                        : <span style={{ color: "var(--text-faint)" }}>—</span>}
+                        : <span style={{ color: "var(--text-faint)" }}>-</span>}
                   </td>
 
                   {/* Position */}
@@ -346,7 +346,7 @@ export function DashboardClientsTable({ clients }: { clients: DashClientRow[] })
                       ? <span style={{ color: "var(--text-faint)" }}>…</span>
                       : position !== null && position > 0
                         ? <PositionCell pos={position} prev={live?.positionPrev ?? null} />
-                        : <span style={{ color: "var(--text-faint)" }}>—</span>}
+                        : <span style={{ color: "var(--text-faint)" }}>-</span>}
                   </td>
 
                   {/* Organic traffic */}
@@ -363,10 +363,10 @@ export function DashboardClientsTable({ clients }: { clients: DashClientRow[] })
                               {fmtNum(live.impressions)}
                               <span style={{ fontSize: 10, color: "var(--text-faint)", marginInlineStart: 3 }}>חשיפות</span>
                             </span>
-                          : <span style={{ color: "var(--text-faint)" }}>—</span>}
+                          : <span style={{ color: "var(--text-faint)" }}>-</span>}
                   </td>
 
-                  {/* Report schedule — shows only the day, no sent/unsent status */}
+                  {/* Report schedule - shows only the day, no sent/unsent status */}
                   <td>
                     {c.autoSend
                       ? <span style={{ fontSize: 12, color: "var(--text-soft)" }}>יום {c.reportSendDay} לחודש</span>
@@ -378,7 +378,7 @@ export function DashboardClientsTable({ clients }: { clients: DashClientRow[] })
                   <td onClick={e => e.stopPropagation()}>
                     {(() => {
                       const s = c.lastReportStatus;
-                      if (!s) return <span style={{ color: "var(--text-faint)", fontSize: 11 }}>—</span>;
+                      if (!s) return <span style={{ color: "var(--text-faint)", fontSize: 11 }}>-</span>;
                       if (s === "SENT") return (
                         <span className="rk-badge success" style={{ fontSize: 11 }}>
                           <CheckCircle2 size={10} style={{ marginInlineEnd: 3 }} />נשלח

@@ -26,13 +26,13 @@ export function OnboardClient({ token, agencyName, email, userName, isOwner }: P
   const [error, setError]       = useState("");
   const [done, setDone]         = useState(false);
 
-  // Step 1 — password
+  // Step 1 - password
   const [password, setPassword] = useState("");
   const [confirm,  setConfirm]  = useState("");
   const [showPw,   setShowPw]   = useState(false);
-  // Step 2 — agency details
+  // Step 2 - agency details
   const [agencyDisplayName, setAgencyDisplayName] = useState(agencyName);
-  // Step 5 — email sender (the "From" for reports sent to this agency's clients)
+  // Step 5 - email sender (the "From" for reports sent to this agency's clients)
   const [senderEmail, setSenderEmail] = useState(email);
   const [senderName,  setSenderName]  = useState(agencyName);
 
@@ -58,7 +58,7 @@ export function OnboardClient({ token, agencyName, email, userName, isOwner }: P
     try {
       await apiPost({ step: "password", password });
       if (!isOwner) {
-        // Members skip the agency-setup steps — go straight to complete
+        // Members skip the agency-setup steps - go straight to complete
         await apiPost({ step: "complete" });
         const result = await signIn("credentials", { email, password, redirect: false });
         if (result?.ok) {
@@ -95,7 +95,7 @@ export function OnboardClient({ token, agencyName, email, userName, isOwner }: P
     if (fromEmail && !fromEmail.includes("@")) { setError("כתובת שולח לא תקינה"); return; }
     setLoading(true);
 
-    // Save the email sender (From) before completing — non-empty only.
+    // Save the email sender (From) before completing - non-empty only.
     try {
       if (fromEmail) {
         await apiPost({ step: "email", emailSenderEmail: fromEmail, emailSenderName: senderName.trim() });
@@ -154,12 +154,12 @@ export function OnboardClient({ token, agencyName, email, userName, isOwner }: P
           <span style={{ fontSize: 20, fontWeight: 800, color: "#fff" }}>{agencyName}</span>
         </div>
 
-        {/* Progress bar — owner only */}
+        {/* Progress bar - owner only */}
         {isOwner && <div style={styles.progressWrap}>
           <div style={{ ...styles.progressBar, width: `${progress}%` }} />
         </div>}
 
-        {/* Step indicators — owner only */}
+        {/* Step indicators - owner only */}
         {isOwner && <div style={styles.steps}>
           {STEPS.map((s, i) => (
             <div key={s.id} style={styles.stepItem}>
@@ -318,7 +318,7 @@ export function OnboardClient({ token, agencyName, email, userName, isOwner }: P
 
               <div style={{ ...styles.infoBox, marginTop: 18 }}>
                 <p style={{ margin: 0, fontSize: 12.5, color: "#374151", lineHeight: 1.7 }}>
-                  שרת הדואר מנוהל מרכזית — אין צורך להגדיר אותו. תבנית המייל, לוגו ונמענים
+                  שרת הדואר מנוהל מרכזית - אין צורך להגדיר אותו. תבנית המייל, לוגו ונמענים
                   בעותק נסתר (BCC) זמינים אח״כ ב<strong>הגדרות → אימייל ושליחות</strong>.
                 </p>
               </div>

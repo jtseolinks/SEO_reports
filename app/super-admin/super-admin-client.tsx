@@ -132,7 +132,7 @@ function StatCard({ icon: Icon, label, value, color }: {
 }
 
 function GoogleBadge({ status, email }: { status: string | null; email: string | null }) {
-  if (!status) return <span style={{ fontSize:11, color:"var(--text-faint)" }}>—</span>;
+  if (!status) return <span style={{ fontSize:11, color:"var(--text-faint)" }}>-</span>;
   const ok = status === "CONNECTED";
   return (
     <span style={{ display:"inline-flex", alignItems:"center", gap:4, fontSize:11,
@@ -178,10 +178,10 @@ function CreateAgencyModal({ onClose, onCreated }: { onClose: () => void; onCrea
   const [ownerName, setOwnerName]   = useState("");
   const [loading, setLoading]       = useState(false);
   const [err, setErr]               = useState("");
-  // When email send fails — show the setup URL so admin can share manually
+  // When email send fails - show the setup URL so admin can share manually
   const [fallbackUrl, setFallbackUrl] = useState("");
   const [emailErr, setEmailErr]       = useState("");
-  // When email send succeeds — show a confirmation instead of closing silently
+  // When email send succeeds - show a confirmation instead of closing silently
   const [sentOk, setSentOk]           = useState(false);
 
   async function submit(e: React.FormEvent) {
@@ -195,17 +195,17 @@ function CreateAgencyModal({ onClose, onCreated }: { onClose: () => void; onCrea
       const data = await res.json();
       if (!res.ok) { setErr(data.error ?? "שגיאה"); return; }
       if (data.emailSent === false) {
-        // Email failed — show manual link
+        // Email failed - show manual link
         setFallbackUrl(data.setupUrl ?? "");
         setEmailErr(data.emailError ?? "שגיאה בשליחת המייל");
       } else {
-        // Email sent — show explicit confirmation (don't close silently)
+        // Email sent - show explicit confirmation (don't close silently)
         setSentOk(true);
       }
     } finally { setLoading(false); }
   }
 
-  // Email sent successfully — explicit confirmation
+  // Email sent successfully - explicit confirmation
   if (sentOk) {
     return (
       <Modal title="סוכנות נוצרה ✓" onClose={onCreated}>
@@ -219,7 +219,7 @@ function CreateAgencyModal({ onClose, onCreated }: { onClose: () => void; onCrea
             </div>
           </div>
           <p style={{ fontSize:11, color:"var(--text-muted)", margin:0 }}>
-            אם המייל לא הגיע — בדוק את תיקיית הספאם, או שלח מחדש מתוך טבלת הסוכנויות.
+            אם המייל לא הגיע - בדוק את תיקיית הספאם, או שלח מחדש מתוך טבלת הסוכנויות.
           </p>
           <button className="btn btn-primary" onClick={onCreated}>
             <CheckCircle2 size={14} style={{ display:"inline", marginLeft:5 }}/> סגור
@@ -229,7 +229,7 @@ function CreateAgencyModal({ onClose, onCreated }: { onClose: () => void; onCrea
     );
   }
 
-  // If email failed — show the fallback URL and let admin close
+  // If email failed - show the fallback URL and let admin close
   if (fallbackUrl) {
     return (
       <Modal title="סוכנות נוצרה ✓" onClose={() => { setFallbackUrl(""); onCreated(); }}>
@@ -281,7 +281,7 @@ function CreateAgencyModal({ onClose, onCreated }: { onClose: () => void; onCrea
         </div>
         <div style={{ borderTop:"1px solid var(--border)", paddingTop:14 }}>
           <p style={{ fontSize:12, color:"var(--text-muted)", marginBottom:12 }}>
-            בעלים ראשוני — ישלח מייל עם קישור הגדרה
+            בעלים ראשוני - ישלח מייל עם קישור הגדרה
           </p>
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
             <div className="field">
@@ -498,7 +498,7 @@ function MembersModal({ agency, onClose }: { agency: Agency; onClose: () => void
                           : <button type="button" style={{ fontSize:10, background:"none", border:"none",
                               cursor:"pointer", color:"#ef4444", padding:0, textDecoration:"underline" }}
                               onClick={() => result.url && navigator.clipboard.writeText(result.url)}>
-                              ⚠ מייל נכשל — העתק קישור
+                              ⚠ מייל נכשל - העתק קישור
                             </button>
                       )}
                     </div>
@@ -556,7 +556,7 @@ function MembersModal({ agency, onClose }: { agency: Agency; onClose: () => void
               <div style={{ padding:"10px 12px", background:"#fff7ed",
                 border:"1px solid #fed7aa", borderRadius:"var(--r-md)", fontSize:12 }}>
                 <p style={{ margin:"0 0 6px", fontWeight:600, color:"#92400e" }}>
-                  שליחת המייל נכשלה — שתף ידנית:
+                  שליחת המייל נכשלה - שתף ידנית:
                 </p>
                 <div style={{ display:"flex", gap:6, alignItems:"center" }}>
                   <span style={{ flex:1, fontFamily:"monospace", direction:"ltr",
@@ -709,7 +709,7 @@ function EditUserModal({ user, onClose, onSaved }: {
   }
 
   return (
-    <Modal title={`עריכת משתמש — ${user.name ?? user.email}`} onClose={onClose}>
+    <Modal title={`עריכת משתמש - ${user.name ?? user.email}`} onClose={onClose}>
       <form onSubmit={save} style={{ display:"flex", flexDirection:"column", gap:14 }}>
         <div className="field">
           <label className="field-label">שם מלא</label>
@@ -763,7 +763,7 @@ function EditUserModal({ user, onClose, onSaved }: {
                     <CheckCircle2 size={11}/> מייל נשלח
                   </span>
                 : <div style={{ fontSize:11, display:"flex", alignItems:"center", gap:4 }}>
-                    <span style={{ color:"#ef4444" }}>שליחה נכשלה —</span>
+                    <span style={{ color:"#ef4444" }}>שליחה נכשלה -</span>
                     {resetResult.url && (
                       <button type="button" style={{ fontSize:11, background:"none", border:"none",
                         cursor:"pointer", color:"var(--accent)", padding:0, textDecoration:"underline" }}
@@ -851,7 +851,7 @@ function UsersTab() {
                   </td>
                   <td style={{ padding:"11px 16px" }}>
                     {u.memberships.length === 0 ? (
-                      <span style={{ fontSize:12, color:"var(--text-faint)" }}>—</span>
+                      <span style={{ fontSize:12, color:"var(--text-faint)" }}>-</span>
                     ) : (
                       <div style={{ display:"flex", flexDirection:"column", gap:2 }}>
                         {u.memberships.slice(0,3).map((m, j) => (
@@ -1002,7 +1002,7 @@ function SmtpTab() {
           <h2 style={{ fontSize:15, fontWeight:700, margin:0 }}>הגדרות שרת דואר (SMTP)</h2>
         </div>
         <p style={{ fontSize:12.5, color:"var(--text-muted)", margin:"0 0 18px", lineHeight:1.6 }}>
-          שרת דואר יחיד לכל המערכת — משמש לשליחת דוחות, הזמנות והגדרת סוכנויות. מומלץ: <strong>Brevo</strong> (300 מיילים/יום חינם).
+          שרת דואר יחיד לכל המערכת - משמש לשליחת דוחות, הזמנות והגדרת סוכנויות. מומלץ: <strong>Brevo</strong> (300 מיילים/יום חינם).
         </p>
 
         <div style={{ display:"grid", gridTemplateColumns:"1fr 110px", gap:12, marginBottom:14 }}>
@@ -1128,7 +1128,7 @@ export function SuperAdminClient({ initialStats }: { initialStats: Stats }) {
   }
 
   async function deleteAgency(a: Agency) {
-    if (!confirm(`למחוק את "${a.name}"? פעולה זו בלתי הפיכה — כל הלקוחות, הדוחות והחיבורים יימחקו.`)) return;
+    if (!confirm(`למחוק את "${a.name}"? פעולה זו בלתי הפיכה - כל הלקוחות, הדוחות והחיבורים יימחקו.`)) return;
     setDeleting(a.id);
     await fetch(`/api/super-admin/agencies/${a.id}`, { method:"DELETE" });
     setAgencies(prev => prev.filter(ag => ag.id !== a.id));
@@ -1219,7 +1219,7 @@ export function SuperAdminClient({ initialStats }: { initialStats: Stats }) {
                           {a.owner ? (
                             <div>
                               <div style={{ fontSize:12, display:"flex", alignItems:"center", gap:5 }}>
-                                {a.owner.name ?? "—"}
+                                {a.owner.name ?? "-"}
                                 {a.ownerSetupPending && (
                                   <span style={{ fontSize:10, background:"#fef3c7", color:"#92400e",
                                     border:"1px solid #fcd34d", borderRadius:4, padding:"1px 5px", fontWeight:600 }}>
@@ -1250,7 +1250,7 @@ export function SuperAdminClient({ initialStats }: { initialStats: Stats }) {
                                         </span>
                                       ) : (
                                         <div style={{ fontSize:10 }}>
-                                          <span style={{ color:"#ef4444" }}>מייל נכשל — </span>
+                                          <span style={{ color:"#ef4444" }}>מייל נכשל - </span>
                                           <button type="button" style={{ fontSize:10, background:"none", border:"none",
                                             cursor:"pointer", color:"#1E2D7D", textDecoration:"underline", padding:0 }}
                                             onClick={() => resendResult.setupUrl && navigator.clipboard.writeText(resendResult.setupUrl)}>
@@ -1263,7 +1263,7 @@ export function SuperAdminClient({ initialStats }: { initialStats: Stats }) {
                                 </>
                               )}
                             </div>
-                          ) : <span style={{ color:"var(--text-faint)", fontSize:12 }}>—</span>}
+                          ) : <span style={{ color:"var(--text-faint)", fontSize:12 }}>-</span>}
                         </td>
                         <td style={{ padding:"11px 14px" }}>
                           <SetupBar percent={a.setupPercent} checks={a.setupChecks} />

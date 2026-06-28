@@ -26,7 +26,7 @@ export async function POST(_req: NextRequest, { params }: Params) {
       return NextResponse.json({ error: "אין בעלים לסוכנות" }, { status: 400 });
     }
     if (ownerMembership.user.passwordHash) {
-      return NextResponse.json({ error: "הבעלים כבר הגדיר סיסמא — ההגדרה הושלמה" }, { status: 400 });
+      return NextResponse.json({ error: "הבעלים כבר הגדיר סיסמא - ההגדרה הושלמה" }, { status: 400 });
     }
 
     const rawToken = await createSetupToken(ownerMembership.user.id, agencyId);

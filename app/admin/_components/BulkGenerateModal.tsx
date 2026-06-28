@@ -118,7 +118,7 @@ function BulkGenerateModal({ onClose }: { onClose: () => void }) {
           <div>
             <div style={{ fontWeight: 700, fontSize: 16, color: "var(--text)" }}>צור דוחות לכלל הלקוחות</div>
             <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginTop: 3 }}>
-              בחר חודש ולקוחות — הדוחות ייווצרו ברצף
+              בחר חודש ולקוחות - הדוחות ייווצרו ברצף
             </div>
           </div>
           {!running && (
@@ -253,7 +253,7 @@ function BulkGenerateModal({ onClose }: { onClose: () => void }) {
               <span style={{ fontSize: 13, fontWeight: 600, color: failedCount === 0 ? "#16a34a" : "#dc2626" }}>
                 {failedCount === 0
                   ? `✓ ${successCount} דוחות נוצרו בהצלחה`
-                  : `${successCount} הצליחו · ${failedCount} נכשלו — רחף על ⚠ לפרטים`}
+                  : `${successCount} הצליחו · ${failedCount} נכשלו - רחף על ⚠ לפרטים`}
               </span>
             </div>
           )}

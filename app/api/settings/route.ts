@@ -20,7 +20,7 @@ export async function PUT(request: NextRequest) {
     const prevSettings = await getAgencySettings(ctx.agencyId);
     await saveAgencySettings(ctx.agencyId, body);
 
-    // When defaultSendDay changes — update this agency's clients that don't have a custom send day
+    // When defaultSendDay changes - update this agency's clients that don't have a custom send day
     if (body.defaultSendDay && body.defaultSendDay !== prevSettings.defaultSendDay) {
       const newDay = parseInt(body.defaultSendDay, 10);
       if (!isNaN(newDay) && newDay >= 1 && newDay <= 28) {

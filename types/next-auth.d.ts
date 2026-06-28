@@ -12,7 +12,7 @@ declare module "next-auth" {
       name?: string;
       role: string;
       isSuperAdmin: boolean;
-      // Active agency (tenant) for this session — null if the user has no membership.
+      // Active agency (tenant) for this session - null if the user has no membership.
       agencyId: string | null;
       membershipRole: MembershipRole | null;
       // All agencies the user belongs to (for the workspace switcher). Session-only.
@@ -38,7 +38,7 @@ declare module "next-auth/jwt" {
     isSuperAdmin: boolean;
     agencyId: string | null;
     membershipRole: MembershipRole | null;
-    // Cached at login — avoids DB hit on every /api/auth/session call.
+    // Cached at login - avoids DB hit on every /api/auth/session call.
     memberships?: SessionMembership[];
   }
 }

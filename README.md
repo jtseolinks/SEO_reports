@@ -8,9 +8,9 @@ Internal admin system for an SEO agency to manage clients, pull Google Search Co
 - **Prisma 7** + PostgreSQL + `@prisma/adapter-pg`
 - **NextAuth v4** (credentials-based admin login)
 - **Tailwind CSS v4** + shadcn/ui (`@base-ui/react`)
-- **Google APIs** — Search Console, Analytics Data, Analytics Admin
-- **Puppeteer** — HTML → PDF generation
-- **Nodemailer** — SMTP email sending
+- **Google APIs** - Search Console, Analytics Data, Analytics Admin
+- **Puppeteer** - HTML → PDF generation
+- **Nodemailer** - SMTP email sending
 
 ## Setup
 
@@ -121,10 +121,10 @@ Open [http://localhost:3000](http://localhost:3000) → redirects to `/login`.
 | `/admin/reports` | All reports history |
 | `/api/auth/google` | Start Google OAuth flow |
 | `/api/auth/google/callback` | OAuth callback (set as redirect URI in Google Cloud) |
-| `/api/reports/generate` | `POST` — generate PDF report |
-| `/api/reports/send` | `POST` — send report by email |
-| `/api/reports/test-email` | `POST` — send test email |
-| `/api/cron/monthly` | `GET?secret=CRON_SECRET` — daily cron for auto-send |
+| `/api/reports/generate` | `POST` - generate PDF report |
+| `/api/reports/send` | `POST` - send report by email |
+| `/api/reports/test-email` | `POST` - send test email |
+| `/api/cron/monthly` | `GET?secret=CRON_SECRET` - daily cron for auto-send |
 
 ## Cron Setup
 
@@ -170,8 +170,8 @@ On Vercel, use Vercel Cron Jobs in `vercel.json`:
 | 2 | ✅ Done | Google OAuth connection, token encryption |
 | 3–6 | ✅ Done | Client CRUD, property mapping, keywords |
 | 7 | ✅ Done | Live data pull via Google APIs |
-| 8 | — | Client performance dashboard |
+| 8 | - | Client performance dashboard |
 | 9 | ✅ Done | Monthly PDF generation (HTML → Puppeteer) |
 | 10 | ✅ Done | Email sending via SMTP (Nodemailer) |
 | 11 | ✅ Done | Monthly cron automation |
-| 12 | — | Polish, empty states, error handling |
+| 12 | - | Polish, empty states, error handling |

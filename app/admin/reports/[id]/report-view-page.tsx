@@ -32,7 +32,7 @@ type Report = {
 };
 
 function fmtDate(iso: string | null) {
-  if (!iso) return "—";
+  if (!iso) return "-";
   return new Date(iso).toLocaleDateString("he-IL", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 function fmtMonth(ym: string) {
@@ -40,7 +40,7 @@ function fmtMonth(ym: string) {
   return new Date(Number(y), Number(m) - 1, 1).toLocaleDateString("he-IL", { month: "long", year: "numeric" });
 }
 function fmtNum(n: number) {
-  if (!n) return "—";
+  if (!n) return "-";
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "M";
   if (n >= 1_000) return (n / 1_000).toFixed(1).replace(/\.0$/, "") + "K";
   return n.toLocaleString("he-IL");
@@ -223,8 +223,8 @@ export function ReportViewPage({ report }: { report: Report }) {
           {[
             { label: "קליקים אורגניים", value: fmtNum(report.gscClicks) },
             { label: "חשיפות", value: fmtNum(report.gscImpressions) },
-            { label: "פוזיציה ממוצעת", value: report.gscPosition > 0 ? report.gscPosition.toFixed(1) : "—" },
-            { label: "CTR ממוצע", value: report.gscCtr > 0 ? (report.gscCtr * 100).toFixed(2) + "%" : "—" },
+            { label: "פוזיציה ממוצעת", value: report.gscPosition > 0 ? report.gscPosition.toFixed(1) : "-" },
+            { label: "CTR ממוצע", value: report.gscCtr > 0 ? (report.gscCtr * 100).toFixed(2) + "%" : "-" },
           ].map(k => (
             <div key={k.label} style={{
               flex: 1, padding: "14px 16px",

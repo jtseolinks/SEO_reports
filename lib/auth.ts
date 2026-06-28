@@ -90,7 +90,7 @@ export const authOptions: NextAuthOptions = {
     // On every successful login:
     // 1. Force-refresh the Google access token (self-heals transient/stuck errors).
     // 2. Make a live GSC ping (listGscSites) to confirm the connection works and
-    //    reset the status to CONNECTED — replacing the "disconnect → reconnect" flow.
+    //    reset the status to CONNECTED - replacing the "disconnect → reconnect" flow.
     // Fire-and-forget; login is never blocked by Google API latency.
     async signIn({ user }) {
       const agencyId = (user as { agencyId?: string | null }).agencyId;
@@ -129,7 +129,7 @@ export const authOptions: NextAuthOptions = {
 
         // Cache memberships in the JWT at login so the session callback never
         // needs a DB round-trip. Stale until re-login, which is acceptable for
-        // an invite-only workspace — membership changes are infrequent.
+        // an invite-only workspace - membership changes are infrequent.
         const ms = await prisma.membership.findMany({
           where: { userId: user.id },
           include: { agency: { select: { name: true } } },
@@ -147,7 +147,7 @@ export const authOptions: NextAuthOptions = {
       // regular users must be a member of the target agency.
       if (trigger === "update" && session?.agencyId && token.id) {
         if (token.isSuperAdmin) {
-          // Super-admin impersonation — grant OWNER-level access to any agency.
+          // Super-admin impersonation - grant OWNER-level access to any agency.
           token.agencyId = session.agencyId;
           token.membershipRole = "OWNER";
         } else {
@@ -166,7 +166,7 @@ export const authOptions: NextAuthOptions = {
       return token;
     },
     async session({ session, token }) {
-      // Pure token read — no DB call. Memberships were cached in the JWT at login.
+      // Pure token read - no DB call. Memberships were cached in the JWT at login.
       if (session.user) {
         session.user.id = token.id as string;
         session.user.role = token.role as string;

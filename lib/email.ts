@@ -15,7 +15,7 @@ async function createTransport() {
   const pass = s.smtpPass;
 
   if (!host || !user || !pass) {
-    throw new Error("SMTP לא מוגדר — פנה למנהל המערכת (Super Admin) להגדרת שרת הדואר במסך הגדרות מייל");
+    throw new Error("SMTP לא מוגדר - פנה למנהל המערכת (Super Admin) להגדרת שרת הדואר במסך הגדרות מייל");
   }
 
   return nodemailer.createTransport({
@@ -233,7 +233,7 @@ async function getPlatformTransport(): Promise<{
   const s = await getPlatformSettings();
 
   if (!s.smtpHost || !s.smtpUser || !s.smtpPass) {
-    throw new Error("SMTP לא מוגדר — הגדר שרת דואר במסך Super Admin → הגדרות מייל");
+    throw new Error("SMTP לא מוגדר - הגדר שרת דואר במסך Super Admin → הגדרות מייל");
   }
 
   const port = parseInt(s.smtpPort || "587");
@@ -245,7 +245,7 @@ async function getPlatformTransport(): Promise<{
   return { transporter, fromEmail, fromName };
 }
 
-/** Invite email for a new team member — simple password-setup link. */
+/** Invite email for a new team member - simple password-setup link. */
 export async function sendMemberInviteEmail(
   to: string,
   agencyName: string,
@@ -309,7 +309,7 @@ export async function sendMemberInviteEmail(
   return info.messageId ?? "";
 }
 
-/** Platform-level onboarding email — full agency setup wizard (OWNER only). */
+/** Platform-level onboarding email - full agency setup wizard (OWNER only). */
 export async function sendOnboardingEmail(
   to: string,
   agencyName: string,
@@ -384,7 +384,7 @@ export async function sendOnboardingEmail(
   return info.messageId ?? "";
 }
 
-/** Password reset email — sent by super-admin to any user. */
+/** Password reset email - sent by super-admin to any user. */
 export async function sendPasswordResetEmail(
   to: string,
   resetUrl: string
@@ -423,7 +423,7 @@ export async function sendPasswordResetEmail(
             </table>
             <p style="margin:0 0 6px;font-size:13px;color:#9CA3AF;">לא עובד הכפתור? העתק את הקישור:</p>
             <p style="margin:0 0 20px;font-size:12px;"><a href="${resetUrl}" dir="ltr" style="color:#1E2D7D;word-break:break-all;">${resetUrl}</a></p>
-            <p style="margin:0;font-size:13px;color:#9CA3AF;">הקישור תקף ל-7 ימים. אם לא ביקשת איפוס סיסמא — התעלם ממייל זה.</p>
+            <p style="margin:0;font-size:13px;color:#9CA3AF;">הקישור תקף ל-7 ימים. אם לא ביקשת איפוס סיסמא - התעלם ממייל זה.</p>
           </td>
         </tr>
         <tr>
@@ -454,7 +454,7 @@ export async function sendPlatformTestEmail(to: string): Promise<string> {
     from: `${fromName} <${fromEmail}>`,
     to,
     subject: "[Test] Rankey SEO Reports – בדיקת הגדרות SMTP",
-    text: "מייל בדיקה ממערכת Rankey SEO Reports.\n\nאם קיבלת אותו — הגדרות שרת הדואר (SMTP) של הפלטפורמה תקינות.",
+    text: "מייל בדיקה ממערכת Rankey SEO Reports.\n\nאם קיבלת אותו - הגדרות שרת הדואר (SMTP) של הפלטפורמה תקינות.",
   });
   return info.messageId ?? "";
 }

@@ -13,7 +13,7 @@
 # testing
 /coverage
 
-# next.js — build on the server (Cloudways) after each pull; never track the build
+# next.js - build on the server (Cloudways) after each pull; never track the build
 /.next/
 /out/
 
@@ -45,6 +45,6 @@ next-env.d.ts
 /private/
 *.pdf
 
-# one-off data with client PII — never commit
+# one-off data with client PII - never commit
 /scripts/client-emails.json
 /scripts/client-brands.json

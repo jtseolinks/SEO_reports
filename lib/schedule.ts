@@ -3,7 +3,7 @@
 // Model: the agency's global `defaultSendDay` is the live default. A client only
 // deviates when it carries an explicit override (`sendDayCustom = true`), in
 // which case its own `reportSendDay` / `reportSendHour` win. Non-custom clients
-// follow the global default dynamically — nothing is copied, so changing the
+// follow the global default dynamically - nothing is copied, so changing the
 // global setting takes effect everywhere at once with no drift.
 
 // Default send hour for non-custom clients. The settings UI presents the global

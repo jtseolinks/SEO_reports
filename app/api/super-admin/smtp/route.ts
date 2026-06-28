@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireSuperAdmin, toResponse } from "@/lib/authz";
 import { getPlatformSettings, savePlatformSettings, maskSecrets } from "@/lib/platform-settings";
 
-// Platform-wide SMTP configuration — single source of truth for all outgoing
+// Platform-wide SMTP configuration - single source of truth for all outgoing
 // mail. Super-admin only. Secrets are masked on the way out and preserved when
 // the masked placeholder is sent back unchanged.
 

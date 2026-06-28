@@ -191,10 +191,10 @@ export function Topbar() {
             {visibleInPanel.length > 0 && (
               <div style={{ padding: "8px 16px 6px", display: "flex", gap: 14, borderBottom: "1px solid var(--border-subtle)" }}>
                 <span style={{ fontSize: 11, color: "var(--text-faint)", display: "flex", alignItems: "center", gap: 4 }}>
-                  <AlertCircle size={11} style={{ color: "var(--red)" }} /> קריטי — תמיד מוצג
+                  <AlertCircle size={11} style={{ color: "var(--red)" }} /> קריטי - תמיד מוצג
                 </span>
                 <span style={{ fontSize: 11, color: "var(--text-faint)", display: "flex", alignItems: "center", gap: 4 }}>
-                  <AlertTriangle size={11} style={{ color: "var(--amber)" }} /> אזהרה — ניתן לסגירה
+                  <AlertTriangle size={11} style={{ color: "var(--amber)" }} /> אזהרה - ניתן לסגירה
                 </span>
               </div>
             )}

@@ -36,7 +36,7 @@ export type SetupTokenData = {
   hasPassword: boolean;
   expired: boolean;
   used: boolean;
-  /** True only for the founding owner of a new agency — shows full 5-step wizard */
+  /** True only for the founding owner of a new agency - shows full 5-step wizard */
   isAgencySetup: boolean;
   membershipRole: string;
 };

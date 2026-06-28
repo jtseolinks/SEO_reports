@@ -27,7 +27,7 @@ export async function GET(request: NextRequest, { params }: Params) {
     if (!auth) return NextResponse.json({ error: "Google not connected" }, { status: 400 });
 
     // Two prior windows of the SAME length as the selected period, shifted back
-    // one and two windows — for the per-keyword position trend (prev month /
+    // one and two windows - for the per-keyword position trend (prev month /
     // 2 months ago when the period is ~1 month).
     const DAY_MS = 86_400_000;
     const shift = (iso: string, days: number) => {

@@ -21,7 +21,7 @@ export async function POST(_req: NextRequest, { params }: Params) {
     if (!membership) {
       return NextResponse.json({ error: "המשתמש אינו חבר בסוכנות" }, { status: 404 });
     }
-    // An ADMIN may not reset an OWNER's password — only another OWNER can.
+    // An ADMIN may not reset an OWNER's password - only another OWNER can.
     if (membership.role === "OWNER" && ctx.role !== "OWNER") {
       throw new HttpError(403, "רק הבעלים יכול לאפס סיסמת בעלים");
     }

@@ -25,7 +25,7 @@ type Report = {
 // ── helpers ──────────────────────────────────────────────────────────────────
 
 function fmtDate(iso: string | null) {
-  if (!iso) return "—";
+  if (!iso) return "-";
   return new Date(iso).toLocaleDateString("he-IL", { day: "2-digit", month: "2-digit", year: "numeric" }) +
     " " + new Date(iso).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });
 }
@@ -36,7 +36,7 @@ function fmtMonth(ym: string) {
 }
 
 function fmtNum(n: number) {
-  if (!n) return "—";
+  if (!n) return "-";
   if (n >= 1_000) return (n / 1_000).toFixed(1).replace(/\.0$/, "") + "K";
   return n.toLocaleString("he-IL");
 }
@@ -411,7 +411,7 @@ export function ReportsTable({ reports: initialReports, months }: { reports: Rep
                     </td>
                     <td><StatusBadge status={r.status} /></td>
                     <td className="hidden-mobile" style={{ color: "var(--text-muted)", fontSize: 12.5 }}>
-                      {r.openCount > 0 ? r.openCount + " פתיחות" : "—"}
+                      {r.openCount > 0 ? r.openCount + " פתיחות" : "-"}
                     </td>
                     <td>
                       <div style={{ display: "flex", alignItems: "center", gap: 2, justifyContent: "flex-end" }}>

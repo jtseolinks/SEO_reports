@@ -124,7 +124,7 @@ export function GoogleConnectionClient({
   }
 
   const statCols = [
-    { tag: "GBP", tagBg: "#FDF3E1", tagColor: "#B45309", label: "פרופילי Business Profile", value: "—" },
+    { tag: "GBP", tagBg: "#FDF3E1", tagColor: "#B45309", label: "פרופילי Business Profile", value: "-" },
     { tag: "GA4", tagBg: "#E6F4EA", tagColor: "#15803D", label: "נכסי Analytics 4",         value: stats.ga4Count },
     { tag: "GSC", tagBg: "#E0F4FF", tagColor: "#0369A1", label: "נכסי Search Console",      value: stats.gscCount },
   ];

@@ -6,7 +6,7 @@ import { validatePassword } from "@/lib/password";
 
 type Params = { params: Promise<{ token: string }> };
 
-// GET — validate token and return metadata (no sensitive info)
+// GET - validate token and return metadata (no sensitive info)
 export async function GET(_req: NextRequest, { params }: Params) {
   const { token } = await params;
   const data = await getSetupToken(token);
@@ -22,7 +22,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
   });
 }
 
-// POST — step operations during wizard
+// POST - step operations during wizard
 export async function POST(req: NextRequest, { params }: Params) {
   const { token } = await params;
   const data = await getSetupToken(token);
@@ -38,7 +38,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     emailSenderName?: string;
   };
 
-  // Step 1 — set password (required before anything else)
+  // Step 1 - set password (required before anything else)
   if (body.step === "password") {
     if (!body.password) {
       return NextResponse.json({ error: "סיסמה נדרשת" }, { status: 400 });
@@ -58,7 +58,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     return NextResponse.json({ ok: true });
   }
 
-  // Step 2 — optional agency details
+  // Step 2 - optional agency details
   if (body.step === "agency-details") {
     if (body.agencyDisplayName?.trim()) {
       await prisma.agencySetting.upsert({
@@ -70,7 +70,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     return NextResponse.json({ ok: true });
   }
 
-  // Step 5 — optional email sender identity (the "From" for this agency's mail)
+  // Step 5 - optional email sender identity (the "From" for this agency's mail)
   if (body.step === "email") {
     const updates: { key: string; value: string }[] = [];
     if (typeof body.emailSenderEmail === "string")
@@ -89,7 +89,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     return NextResponse.json({ ok: true });
   }
 
-  // complete — mark token used
+  // complete - mark token used
   if (body.step === "complete") {
     if (!data.used) await consumeSetupToken(data.id);
     return NextResponse.json({ ok: true });

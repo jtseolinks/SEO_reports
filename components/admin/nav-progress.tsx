@@ -24,7 +24,7 @@ export function NavProgress() {
     }, 280);
   }
 
-  // Trigger on any internal link click — immediate, capture phase.
+  // Trigger on any internal link click - immediate, capture phase.
   useEffect(() => {
     function onClick(e: MouseEvent) {
       const anchor = (e.target as Element).closest("a[href]") as HTMLAnchorElement | null;
@@ -117,7 +117,7 @@ export function NavProgress() {
         }}
       />
 
-      {/* Centering wrapper — keeps the card centered regardless of the card's
+      {/* Centering wrapper - keeps the card centered regardless of the card's
           own animation transform (which would otherwise override translate). */}
       <div
         style={{
@@ -177,7 +177,7 @@ export function NavProgress() {
               animation: "np-spin 0.8s linear infinite",
             }}
           />
-          {/* Inner ring — counter-rotate, navy */}
+          {/* Inner ring - counter-rotate, navy */}
           <div
             style={{
               position: "absolute",

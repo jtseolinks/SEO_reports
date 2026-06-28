@@ -25,7 +25,7 @@ export type AgencySettings = {
   reportFooterText:   string;   // custom footer line in PDF
 
   // ── Email & sending ─────────────────────────────────────────────────────────
-  // (SMTP transport credentials are platform-level — see lib/platform-settings.ts)
+  // (SMTP transport credentials are platform-level - see lib/platform-settings.ts)
   emailSenderName:      string; // "From" name
   emailSenderEmail:     string; // "From" / reply-to address
   emailSubjectTemplate: string; // e.g. "דוח SEO חודשי – {client} – {month}"

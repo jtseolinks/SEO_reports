@@ -13,7 +13,7 @@ export async function listGa4Properties(auth: OAuth2Client): Promise<Ga4Property
   const admin = google.analyticsadmin({ version: "v1beta", auth });
   const properties: Ga4Property[] = [];
 
-  // Use accountSummaries — returns accounts + all their properties in one call,
+  // Use accountSummaries - returns accounts + all their properties in one call,
   // with full pagination support. Much faster and more complete than iterating
   // accounts then properties separately.
   let pageToken: string | undefined;

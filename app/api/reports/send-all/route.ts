@@ -46,7 +46,7 @@ export async function POST() {
         data: { status: "SENT", sentAt: new Date(), emailTo: client.contactEmail, emailCc: client.ccEmails, pdfUrl: null },
       });
 
-      // Report delivered — drop the PDF file, keep only the status record.
+      // Report delivered - drop the PDF file, keep only the status record.
       await deleteReportFile(report.pdfUrl!);
 
       await prisma.reportEmailLog.create({
@@ -91,7 +91,7 @@ export async function POST() {
   return NextResponse.json({ sent, failed, total: eligible.length, results });
 }
 
-/** GET — preview how many reports are ready to send */
+/** GET - preview how many reports are ready to send */
 export async function GET() {
   let ctx;
   try {

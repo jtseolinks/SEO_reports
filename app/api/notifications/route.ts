@@ -86,7 +86,7 @@ export async function GET() {
         notes.push({
           id: `gsc-perm-${prop.clientId}`,
           type: "critical" as const,
-          title: `אין הרשאה ל-GSC — ${prop.client.name}`,
+          title: `אין הרשאה ל-GSC - ${prop.client.name}`,
           body: `חשבון Google אינו מורשה לנכס "${prop.gscSiteUrl}". יש להוסיף הרשאה ב-Search Console.`,
           href: `/admin/clients/${prop.clientId}`,
         });
@@ -98,7 +98,7 @@ export async function GET() {
       notes.push({
         id: `no-ga4-${prop.clientId}`,
         type: "warn",
-        title: `GA4 לא מוגדר — ${prop.client.name}`,
+        title: `GA4 לא מוגדר - ${prop.client.name}`,
         body: "לקוח פעיל ללא חיבור Google Analytics 4.",
         href: `/admin/clients/${prop.clientId}`,
       });
@@ -121,7 +121,7 @@ export async function GET() {
     notes.push({
       id: `no-props-${c.id}`,
       type: "warn",
-      title: `${c.name} — אין נכסי Google`,
+      title: `${c.name} - אין נכסי Google`,
       body: "לקוח פעיל ללא חיבור GSC/GA4.",
       href: `/admin/clients/${c.id}`,
     });
@@ -143,7 +143,7 @@ export async function GET() {
     notes.push({
       id: `report-fail-${r.id}`,
       type: "critical" as const,
-      title: `יצירת דוח נכשלה — ${r.client.name}`,
+      title: `יצירת דוח נכשלה - ${r.client.name}`,
       body: r.errorMessage?.slice(0, 120) ?? "שגיאה לא ידועה",
       href: `/admin/clients/${r.client.id}`,
     });

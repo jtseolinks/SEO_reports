@@ -1,6 +1,6 @@
 // Simple in-memory fixed-window rate limiter for login brute-force protection.
 // Note: state is per server instance. On multi-instance/serverless deployments
-// this still raises the cost of brute force but is not a global guarantee — a
+// this still raises the cost of brute force but is not a global guarantee - a
 // shared store (e.g. Redis) would be needed for that.
 
 type Entry = { count: number; resetAt: number };

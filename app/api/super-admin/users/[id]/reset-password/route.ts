@@ -17,7 +17,7 @@ export async function POST(_req: NextRequest, { params }: Params) {
     });
     if (!user) return NextResponse.json({ error: "משתמש לא נמצא" }, { status: 404 });
 
-    // Need an agencyId for the token — pick the user's first membership.
+    // Need an agencyId for the token - pick the user's first membership.
     const membership = await prisma.membership.findFirst({
       where: { userId },
       orderBy: { createdAt: "asc" },

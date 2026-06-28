@@ -6,7 +6,7 @@ import Link from "next/link";
 import {
   ChevronLeft, ExternalLink, RefreshCw, Send, Eye, Loader2,
   Plus, X, Download, AlertTriangle, FileText, CheckCircle2,
-  Clock, Settings2, Trash2, Minus, FlaskConical,
+  Clock, Settings2, Trash2, FlaskConical,
 } from "lucide-react";
 
 import { type ReportConfig, DEFAULT_REPORT_CONFIG, REPORT_SECTIONS, parseReportConfig } from "@/lib/report-config";
@@ -47,7 +47,7 @@ type Period = "1m" | "3m" | "6m" | "custom";
 // ── helpers ──────────────────────────────────────────────────────────────────
 
 function fmtDate(iso: string | null) {
-  if (!iso) return "—";
+  if (!iso) return "-";
   return new Date(iso).toLocaleDateString("he-IL", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 function fmtNum(n: number) {
@@ -92,24 +92,6 @@ function ClientAvatar({ name, size = 44 }: { name: string; size?: number }) {
       {initials}
     </div>
   );
-}
-
-function ReportStatusBadge({ status }: { status: string }) {
-  if (status === "GENERATING") {
-    return (
-      <span className="rk-badge info" style={{ gap: 5 }}>
-        <Loader2 size={10} className="animate-spin" />בתהליך ייצור
-      </span>
-    );
-  }
-  const map: Record<string, { cls: string; label: string }> = {
-    SENT:      { cls: "success", label: "נשלח" },
-    GENERATED: { cls: "info",    label: "דוח מוכן" },
-    DRAFT:     { cls: "warn",    label: "ממתין" },
-    FAILED:    { cls: "danger",  label: "כשל" },
-  };
-  const m = map[status] ?? { cls: "neutral", label: status };
-  return <span className={`rk-badge ${m.cls}`}><span className="pip" />{m.label}</span>;
 }
 
 function Toggle({ value, onChange, disabled }: { value: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
@@ -174,8 +156,6 @@ export function ClientDetailPage({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deletingReportId, setDeletingReportId] = useState<string | null>(null);
-  const [selectedReports, setSelectedReports] = useState<Set<string>>(new Set());
-  const [reportsBulkBusy, setReportsBulkBusy] = useState(false);
   const [autoSend, setAutoSend] = useState(initialClient.autoSend);
 
   // Test-send popover
@@ -308,7 +288,7 @@ export function ClientDetailPage({
   const effSendDay  = sendDayCustom ? reportSendDay : defaultSendDay;
   const effSendHour = sendDayCustom ? reportSendHour : defaultSendHour;
 
-  // Active period — set by GscLivePanel, used for report generation
+  // Active period - set by GscLivePanel, used for report generation
   const [activePeriod, setActivePeriod] = useState<{ startDate: string; endDate: string }>(() => {
     const today = new Date();
     const end = today.toISOString().split("T")[0];
@@ -324,7 +304,7 @@ export function ClientDetailPage({
   const nextDate = calcNextReportDate(effSendDay, autoSend);
   const latestReport = reports[0] ?? null;
 
-  // Central refresh — re-fetches all client-side data and triggers server re-render
+  // Central refresh - re-fetches all client-side data and triggers server re-render
   const refreshAll = useCallback(async () => {
     setRefreshKey(k => k + 1);
     startTransition(() => router.refresh());
@@ -433,49 +413,11 @@ export function ClientDetailPage({
       const res = await fetch(`/api/reports/${reportId}`, { method: "DELETE" });
       if (res.ok) {
         setReports(prev => prev.filter(r => r.id !== reportId));
-        setSelectedReports(prev => { const n = new Set(prev); n.delete(reportId); return n; });
         await refreshAll();
       }
     } finally {
       setDeletingReportId(null);
     }
-  }
-
-  const selectableReports = reports.filter(r => r.status !== "GENERATING");
-  const allReportsSelected = selectableReports.length > 0 && selectableReports.every(r => selectedReports.has(r.id));
-  const someReportsSelected = selectedReports.size > 0 && !allReportsSelected;
-
-  function toggleAllReports() {
-    setSelectedReports(allReportsSelected ? new Set() : new Set(selectableReports.map(r => r.id)));
-  }
-  function toggleOneReport(id: string) {
-    setSelectedReports(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
-  }
-
-  async function bulkDeleteReports() {
-    if (!window.confirm(`למחוק ${selectedReports.size} דוחות? פעולה זו אינה הפיכה.`)) return;
-    setReportsBulkBusy(true);
-    const ids = [...selectedReports];
-    await Promise.all(ids.map(id => fetch(`/api/reports/${id}`, { method: "DELETE" })));
-    setReports(prev => prev.filter(r => !ids.includes(r.id)));
-    setSelectedReports(new Set());
-    setReportsBulkBusy(false);
-    await refreshAll();
-  }
-
-  async function bulkSendReports() {
-    setReportsBulkBusy(true);
-    const ids = [...selectedReports].filter(id => reports.find(r => r.id === id && r.pdfUrl));
-    for (const id of ids) {
-      await fetch("/api/reports/send", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reportId: id }),
-      });
-    }
-    setSelectedReports(new Set());
-    setReportsBulkBusy(false);
-    await refreshAll();
   }
 
   function addRecipient() {
@@ -832,7 +774,7 @@ export function ClientDetailPage({
               </div>
 
 
-              {/* Exclude from reports — prominent warning row */}
+              {/* Exclude from reports - prominent warning row */}
               <div style={{
                 display: "flex", alignItems: "center", justifyContent: "space-between",
                 padding: "10px 12px", borderRadius: "var(--r-md)",
@@ -845,7 +787,7 @@ export function ClientDetailPage({
                     מוחרג מדוחות
                   </div>
                   <div style={{ fontSize: 11, color: "var(--text-faint)" }}>
-                    {excludeFromReports ? "ייצור ושליחת דוחות מושבתים ללקוח זה" : "לקוח פעיל — דוחות מופקים כרגיל"}
+                    {excludeFromReports ? "ייצור ושליחת דוחות מושבתים ללקוח זה" : "לקוח פעיל - דוחות מופקים כרגיל"}
                   </div>
                 </div>
                 <Toggle value={excludeFromReports} onChange={v => { setExcludeFromReports(v); if (v) setAutoSend(false); }} />
@@ -874,7 +816,7 @@ export function ClientDetailPage({
                       )}
                     </div>
                     <div style={{ fontSize: 11, color: "var(--text-faint)", marginTop: 2 }}>
-                      {sendDayCustom ? "ייחודי ללקוח זה — לא יושפע משינוי כללי" : "מסונכרן עם הגדרת ברירת המחדל"}
+                      {sendDayCustom ? "ייחודי ללקוח זה - לא יושפע משינוי כללי" : "מסונכרן עם הגדרת ברירת המחדל"}
                     </div>
                   </div>
                   {sendDayCustom && (
@@ -914,7 +856,7 @@ export function ClientDetailPage({
                 </div>
               </div>
 
-              {/* Save action — bottom of the report-settings section */}
+              {/* Save action - bottom of the report-settings section */}
               <div style={{ display: "flex", justifyContent: "flex-end", borderTop: "1px solid var(--border-subtle)", paddingTop: 14 }}>
                 <button onClick={saveSettings} disabled={saving} className="btn btn-secondary sm">
                   {saving ? <Loader2 size={11} className="animate-spin" /> : null} שמור
@@ -982,14 +924,14 @@ export function ClientDetailPage({
           {/* Latest report */}
           {latestReport && (
             <div className="card">
-              <div className="card-head">
+              <div className="card-head" style={{ flexDirection: "column", alignItems: "stretch", gap: 12 }}>
                 <div>
-                  <h3 className="card-title">דוח אחרון — {fmtMonth(latestReport.reportMonth)}</h3>
+                  <h3 className="card-title" style={{ whiteSpace: "nowrap" }}>דוח אחרון - {fmtMonth(latestReport.reportMonth)}</h3>
                   <p className="card-sub">
-                    נוצר {fmtDate(latestReport.generatedAt)} · {fmtDate(latestReport.sentAt) !== "—" ? `נשלח ${fmtDate(latestReport.sentAt)}` : "טרם נשלח"}
+                    נוצר {fmtDate(latestReport.generatedAt)} · {fmtDate(latestReport.sentAt) !== "-" ? `נשלח ${fmtDate(latestReport.sentAt)}` : "טרם נשלח"}
                   </p>
                 </div>
-                <div style={{ display: "flex", gap: 6 }}>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                   {latestReport.pdfUrl && (
                     <>
                       <button
@@ -1011,6 +953,17 @@ export function ClientDetailPage({
                       </a>
                     </>
                   )}
+                  {latestReport.status !== "GENERATING" && (
+                    <button
+                      onClick={() => deleteReport(latestReport.id)}
+                      disabled={deletingReportId === latestReport.id}
+                      className="btn btn-ghost sm"
+                      title="מחק דוח"
+                      style={{ color: "var(--red)" }}
+                    >
+                      {deletingReportId === latestReport.id ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />} מחק
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -1025,10 +978,10 @@ export function ClientDetailPage({
                   {[
                     { label: "קליקים", val: fmtNum(latestReport.gscClicks) },
                     { label: "חשיפות", val: fmtNum(latestReport.gscImpressions) },
-                    { label: "פוזיציה", val: latestReport.gscPosition > 0 ? latestReport.gscPosition.toFixed(1) : "—" },
+                    { label: "פוזיציה", val: latestReport.gscPosition > 0 ? latestReport.gscPosition.toFixed(1) : "-" },
                   ].map(s => (
                     <div key={s.label} style={{ textAlign: "center" }}>
-                      <div style={{ fontSize: 18, fontWeight: 700, color: "var(--text)" }}>{s.val || "—"}</div>
+                      <div style={{ fontSize: 18, fontWeight: 700, color: "var(--text)" }}>{s.val || "-"}</div>
                       <div style={{ fontSize: 11, color: "var(--text-faint)" }}>{s.label}</div>
                     </div>
                   ))}
@@ -1068,105 +1021,6 @@ export function ClientDetailPage({
             </div>
           )}
 
-          {/* Report history */}
-          {reports.length > 0 && (
-            <div className="card">
-              <div className="card-head" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
-                <div>
-                  <h3 className="card-title">היסטוריית דוחות</h3>
-                  <p className="card-sub">12 החודשים האחרונים</p>
-                </div>
-                {selectedReports.size > 0 && (
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span style={{ fontSize: 13, color: "var(--text-muted)" }}>{selectedReports.size} נבחרו</span>
-                    <button onClick={bulkSendReports} disabled={reportsBulkBusy} className="btn btn-secondary sm" style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                      {reportsBulkBusy ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />} שלח
-                    </button>
-                    <button onClick={bulkDeleteReports} disabled={reportsBulkBusy} className="btn btn-secondary sm" style={{ display: "flex", alignItems: "center", gap: 4, color: "var(--red)" }}>
-                      {reportsBulkBusy ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />} מחק
-                    </button>
-                    <button onClick={() => setSelectedReports(new Set())} className="btn btn-ghost sm">ביטול</button>
-                  </div>
-                )}
-              </div>
-              <div className="table-wrap">
-                <table className="tbl">
-                  <thead>
-                    <tr>
-                      <th style={{ width: 40, paddingInlineEnd: 0 }}>
-                        <button onClick={toggleAllReports} style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 24, height: 24 }}>
-                          {allReportsSelected ? <span style={{ fontSize: 16, color: "var(--accent)" }}>✓</span>
-                            : someReportsSelected ? <Minus size={14} style={{ color: "var(--accent)" }} />
-                            : <span style={{ width: 14, height: 14, border: "1.5px solid var(--border-strong)", borderRadius: 3, display: "inline-block" }} />}
-                        </button>
-                      </th>
-                      <th>תקופה</th>
-                      <th>סטטוס</th>
-                      <th style={{ textAlign: "end" }}>פעולות</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {reports.map(r => (
-                      <tr key={r.id} className={selectedReports.has(r.id) ? "is-selected" : ""}>
-                        <td style={{ paddingInlineEnd: 0 }}>
-                          {r.status !== "GENERATING" && (
-                            <button onClick={() => toggleOneReport(r.id)} style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 24, height: 24 }}>
-                              {selectedReports.has(r.id)
-                                ? <span style={{ fontSize: 16, color: "var(--accent)" }}>✓</span>
-                                : <span style={{ width: 14, height: 14, border: "1.5px solid var(--border-strong)", borderRadius: 3, display: "inline-block" }} />}
-                            </button>
-                          )}
-                        </td>
-                        <td style={{ fontWeight: 600, fontSize: 13 }}>{fmtMonth(r.reportMonth)}</td>
-                        <td><ReportStatusBadge status={r.status} /></td>
-                        <td>
-                          <div style={{ display: "flex", alignItems: "center", gap: 4, justifyContent: "flex-end" }}>
-                            {r.pdfUrl && (
-                              <>
-                                <button onClick={() => sendReport(r.id)} disabled={sendingId === r.id} className="iconbtn" title="שלח ללקוח">
-                                  {sendingId === r.id ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    setTestSendReportId(r.id);
-                                    setTestSendEmail("");
-                                    setTestSendResult(null);
-                                  }}
-                                  className="iconbtn"
-                                  title="שלח ניסיון"
-                                  style={{ color: "var(--accent)" }}
-                                >
-                                  <FlaskConical size={13} />
-                                </button>
-                                <a href={r.pdfUrl} download className="iconbtn" title="הורד PDF"><Download size={13} /></a>
-                                <Link href={`/admin/reports/${r.id}`} className="iconbtn" title="צפייה"><Eye size={13} /></Link>
-                              </>
-                            )}
-                            {r.status !== "GENERATING" && (
-                              <button onClick={generateReport} disabled={generating} className="iconbtn" title="צור מחדש">
-                                <RefreshCw size={13} />
-                              </button>
-                            )}
-                            {r.errorMessage && (
-                              <span title={r.errorMessage} style={{ color: "var(--red)", cursor: "help" }}>
-                                <AlertTriangle size={13} />
-                              </span>
-                            )}
-                            {r.status !== "GENERATING" && (
-                              <button onClick={() => deleteReport(r.id)} disabled={deletingReportId === r.id} className="iconbtn" title="מחק דוח" style={{ color: "var(--red)" }}>
-                                {deletingReportId === r.id ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
           {/* Schedule */}
           <div className="card">
             <div className="card-head">
@@ -1180,7 +1034,7 @@ export function ClientDetailPage({
                 <div>
                   <div style={{ fontSize: 12, color: "var(--text-faint)" }}>הדוח הבא</div>
                   <div style={{ fontSize: 16, fontWeight: 700, color: "var(--text)" }}>
-                    {nextDate ? fmtDate(nextDate.toISOString()) : "—"}
+                    {nextDate ? fmtDate(nextDate.toISOString()) : "-"}
                   </div>
                   {nextDate && (
                     <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
@@ -1353,7 +1207,7 @@ function DualLineChart({ trendData, loading }: {
 
 // Period presets mirror Google Search Console's own ranges so the numbers line
 // up 1:1. GSC anchors every preset to the last day with data (≈3-day freshness
-// lag), and its "3/6 months" are calendar months — not 90/180 fixed days.
+// lag), and its "3/6 months" are calendar months - not 90/180 fixed days.
 const GSC_LAG_DAYS = 3;
 const PERIOD_OPTIONS: { key: Period; label: string; days?: number; months?: number }[] = [
   { key: "1m",     label: "28 ימים",    days: 28 },
@@ -1428,10 +1282,10 @@ function GscLivePanel({ clientId, hasProperties, onPeriodChange, refreshKey }: {
   };
 
   const kpis = [
-    { label: 'סה"כ קליקים', value: data ? fmtBig(data.clicks) : "—", color: "#1E6FBF", bg: "#E8F4FF", border: "#bfdbfe" },
-    { label: 'סה"כ הופעות', value: data ? fmtBig(data.impressions) : "—", color: "#7C3AED", bg: "#F5F3FF", border: "#ddd6fe" },
-    { label: "CTR ממוצע",   value: data ? (data.ctr * 100).toFixed(2) + "%" : "—",   color: "#059669", bg: "#ECFDF5", border: "#a7f3d0" },
-    { label: "מיקום ממוצע", value: data ? data.position.toFixed(1) : "—",             color: "#D97706", bg: "#FFFBEB", border: "#fde68a" },
+    { label: 'סה"כ קליקים', value: data ? fmtBig(data.clicks) : "-", color: "#1E6FBF", bg: "#E8F4FF", border: "#bfdbfe" },
+    { label: 'סה"כ הופעות', value: data ? fmtBig(data.impressions) : "-", color: "#7C3AED", bg: "#F5F3FF", border: "#ddd6fe" },
+    { label: "CTR ממוצע",   value: data ? (data.ctr * 100).toFixed(2) + "%" : "-",   color: "#059669", bg: "#ECFDF5", border: "#a7f3d0" },
+    { label: "מיקום ממוצע", value: data ? data.position.toFixed(1) : "-",             color: "#D97706", bg: "#FFFBEB", border: "#fde68a" },
   ];
 
   return (
@@ -1481,7 +1335,7 @@ function GscLivePanel({ clientId, hasProperties, onPeriodChange, refreshKey }: {
         }}>
           <span style={{ fontSize: 12.5, color: "var(--text-soft)" }}>טווח תאריכים:</span>
           <input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)} style={dateInputStyle} />
-          <span style={{ color: "var(--text-faint)" }}>—</span>
+          <span style={{ color: "var(--text-faint)" }}>-</span>
           <input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)} style={dateInputStyle} />
         </div>
       )}
@@ -1530,7 +1384,7 @@ function GscLivePanel({ clientId, hasProperties, onPeriodChange, refreshKey }: {
 
         <DualLineChart trendData={data?.trendData ?? []} loading={loading} />
 
-        {/* GA4 stats row — shown only when GA4 data available */}
+        {/* GA4 stats row - shown only when GA4 data available */}
         {data?.ga4 && !loading && (
           <div style={{
             marginTop: 16, paddingTop: 14,
@@ -1540,8 +1394,8 @@ function GscLivePanel({ clientId, hasProperties, onPeriodChange, refreshKey }: {
             {[
               { label: "סשנים אורגניים",          value: fmtBig(data.ga4.sessions),                   color: "#0369A1", icon: "📈", dim: false },
               { label: "הכנסות",                   value: "₪" + fmtBig(data.ga4.revenue ?? 0),         color: "#16a34a", icon: "💰", dim: false },
-              { label: "סשנים — תקופה קודמת",     value: fmtBig(data.ga4.prevSessions ?? 0),           color: "#6b7280", icon: "📈", dim: true  },
-              { label: "הכנסות — תקופה קודמת",    value: "₪" + fmtBig(data.ga4.prevRevenue ?? 0),      color: "#6b7280", icon: "💰", dim: true  },
+              { label: "סשנים - תקופה קודמת",     value: fmtBig(data.ga4.prevSessions ?? 0),           color: "#6b7280", icon: "📈", dim: true  },
+              { label: "הכנסות - תקופה קודמת",    value: "₪" + fmtBig(data.ga4.prevRevenue ?? 0),      color: "#6b7280", icon: "💰", dim: true  },
             ].map((s, i, arr) => (
               <div key={s.label} style={{
                 padding: "10px 14px",
@@ -1612,7 +1466,7 @@ function ReportConfigPanel({ clientId }: { clientId: string }) {
   return (
     <div className="card" style={{ marginBottom: 16 }}>
       <div className="card-head" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <h3 className="card-title">הגדרות דוח — נתונים להצגה</h3>
+        <h3 className="card-title">הגדרות דוח - נתונים להצגה</h3>
         {saving && <span style={{ fontSize: 11.5, color: "var(--text-faint)" }}>שומר...</span>}
       </div>
 
@@ -1659,13 +1513,13 @@ type Keyword = {
 };
 
 // One position cell. Shows this period's position, plus a delta vs the PRIOR
-// (older) period — so each column reflects the change that happened from the
+// (older) period - so each column reflects the change that happened from the
 // period before it to itself. Lower rank number = better. The arrow points the
 // way the site moved in Google results: climbed = green ▲ (number fell),
 // dropped = red ▼ (number rose). `prev` null → number only (oldest column, or
 // no data for the older window).
 function PosCell({ pos, prev }: { pos: number | null; prev: number | null }) {
-  if (pos == null) return <span style={{ color: "var(--text-faint)", fontSize: 12 }}>—</span>;
+  if (pos == null) return <span style={{ color: "var(--text-faint)", fontSize: 12 }}>-</span>;
   const color = pos <= 3 ? "var(--green)" : pos <= 10 ? "var(--accent)" : pos <= 20 ? "var(--amber)" : "var(--text-faint)";
   const num = <span style={{ fontWeight: 700, color, fontSize: 13, minWidth: 26, display: "inline-block" }}>{pos.toFixed(1)}</span>;
   if (prev == null) return num;
@@ -1750,7 +1604,7 @@ function GbpLivePanel({ clientId, locationName, activePeriod, refreshKey }: {
       {(data?.rating || data?.reviewCount) && (
         <div style={{ padding: "10px 20px 0", display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{ fontSize: 26, fontWeight: 800, color: "#D97706", lineHeight: 1 }}>
-            {data.rating?.toFixed(1) ?? "—"}
+            {data.rating?.toFixed(1) ?? "-"}
           </div>
           <div>
             <div style={{ display: "flex", gap: 2 }}>
@@ -1770,7 +1624,7 @@ function GbpLivePanel({ clientId, locationName, activePeriod, refreshKey }: {
         {stats.map(s => (
           <div key={s.label} style={{ display: "flex", flexDirection: "column", gap: 2 }}>
             <div style={{ fontSize: 18, fontWeight: 700, color: loading ? "var(--text-faint)" : s.color, fontVariantNumeric: "tabular-nums" }}>
-              {loading ? "—" : (s.val ?? 0).toLocaleString()}
+              {loading ? "-" : (s.val ?? 0).toLocaleString()}
             </div>
             <div style={{ fontSize: 11, color: "var(--text-faint)" }}>{s.label}</div>
           </div>
@@ -1879,7 +1733,7 @@ function KeywordsPanel({ clientId, hasProperties, brandKeywords, activePeriod, o
   const manualOnlyKws = [...reportKws].filter(kw => !keywords.some(k => k.query === kw));
 
   // Trend column labels/tooltips. The API compares each keyword to the previous
-  // and prior windows of the SAME length as the selected period — so the labels
+  // and prior windows of the SAME length as the selected period - so the labels
   // must track the period: "חודש קודם" only for the ~28-day preset, otherwise
   // phrased in the period's own length.
   const trendWin = (() => {
@@ -1965,7 +1819,7 @@ function KeywordsPanel({ clientId, hasProperties, brandKeywords, activePeriod, o
             <textarea
               value={bulkInput}
               onChange={e => setBulkInput(e.target.value)}
-              placeholder={"הכנס ביטויים — שורה אחת לכל ביטוי או מופרדים בפסיק"}
+              placeholder={"הכנס ביטויים - שורה אחת לכל ביטוי או מופרדים בפסיק"}
               rows={4}
               style={{
                 width: "100%", padding: "8px 10px", fontSize: 12.5,
@@ -1985,7 +1839,7 @@ function KeywordsPanel({ clientId, hasProperties, brandKeywords, activePeriod, o
           </div>
         )}
 
-        {/* Chips — report keywords */}
+        {/* Chips - report keywords */}
         {reportKws.size > 0 && (
           <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
             {[...reportKws].sort().map(kw => {
@@ -2016,7 +1870,7 @@ function KeywordsPanel({ clientId, hasProperties, brandKeywords, activePeriod, o
 
         {reportKws.size === 0 && !showManualInput && (
           <div style={{ fontSize: 12, color: "var(--text-faint)" }}>
-            סמן ביטויים מהטבלה או הוסף ידנית — הם יופיעו בדוח.
+            סמן ביטויים מהטבלה או הוסף ידנית - הם יופיעו בדוח.
           </div>
         )}
       </div>

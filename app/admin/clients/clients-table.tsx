@@ -31,7 +31,7 @@ type BulkAction = "delete" | "activate" | "deactivate";
 // ── helpers ──────────────────────────────────────────────────────────────────
 
 function fmtDate(iso: string | null) {
-  if (!iso) return "—";
+  if (!iso) return "-";
   return new Date(iso).toLocaleDateString("he-IL", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
@@ -53,7 +53,7 @@ function DataBadge({ has }: { has: boolean }) {
 }
 
 function ReportBadge({ status }: { status: string | null }) {
-  if (!status) return <span style={{ color: "var(--text-faint)", fontSize: 12 }}>—</span>;
+  if (!status) return <span style={{ color: "var(--text-faint)", fontSize: 12 }}>-</span>;
   const map: Record<string, { cls: string; label: string }> = {
     SENT:      { cls: "success", label: "נשלח" },
     GENERATED: { cls: "info",    label: "דוח מוכן" },

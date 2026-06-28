@@ -6,7 +6,7 @@ import { Topbar } from "@/components/admin/header";
 import { SessionProvider } from "@/components/admin/session-provider";
 import { prisma } from "@/lib/prisma";
 
-// Fetches in parallel — does NOT block layout render.
+// Fetches in parallel - does NOT block layout render.
 // Scoped to the active agency so counts are per-tenant.
 async function SidebarWithCounts() {
   const session = await getServerSession(authOptions);
@@ -22,7 +22,7 @@ async function SidebarWithCounts() {
   return <Sidebar counts={{ clients, reports }} />;
 }
 
-// Sync (not async) — renders immediately, no blocking
+// Sync (not async) - renders immediately, no blocking
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
     <SessionProvider>

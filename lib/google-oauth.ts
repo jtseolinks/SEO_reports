@@ -81,7 +81,7 @@ export async function exchangeCodeAndSave(agencyId: string, code: string): Promi
     const { data } = await oauth2.userinfo.get();
     googleEmail = data.email ?? undefined;
   } catch {
-    // Email is optional — continue without it
+    // Email is optional - continue without it
   }
 
   const encryptedAccessToken = tokens.access_token
@@ -131,7 +131,7 @@ export async function getValidAccessToken(
   const connection = await getGoogleConnection(agencyId);
   if (!connection) return null;
   // When `force` is set (e.g. on login) we retry the refresh even if a previous
-  // attempt flagged the connection as REQUIRES_REAUTH — a stuck status caused by
+  // attempt flagged the connection as REQUIRES_REAUTH - a stuck status caused by
   // a transient failure can then self-heal as long as the refresh token is valid.
   if (!options?.force && connection.status === "REQUIRES_REAUTH") return null;
   if (!connection.encryptedRefreshToken) return null;
@@ -186,7 +186,7 @@ export async function getAuthenticatedClient(agencyId: string): Promise<OAuth2Cl
   const refreshToken = decrypt(connection.encryptedRefreshToken);
 
   // Always force-refresh the access token. This self-heals REQUIRES_REAUTH and ERROR
-  // states caused by transient failures — no manual disconnect/reconnect needed.
+  // states caused by transient failures - no manual disconnect/reconnect needed.
   // Only returns null when the refresh token itself is permanently revoked.
   const accessToken = await getValidAccessToken(agencyId, { force: true });
   if (!accessToken) return null;

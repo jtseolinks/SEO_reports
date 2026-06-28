@@ -62,7 +62,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
   }
 }
 
-// Add a user (existing or new) to an agency — sends setup email if new user or no password yet.
+// Add a user (existing or new) to an agency - sends setup email if new user or no password yet.
 export async function POST(req: NextRequest, { params }: Params) {
   try {
     await requireSuperAdmin();
@@ -78,7 +78,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     const agency = await prisma.agency.findUnique({ where: { id: agencyId }, select: { name: true } });
     if (!agency) return NextResponse.json({ error: "סוכנות לא נמצאה" }, { status: 404 });
 
-    // Find or create user (no password — they'll set it via setup link)
+    // Find or create user (no password - they'll set it via setup link)
     let user = await prisma.user.findUnique({ where: { email: emailLower } });
     const isNewUser = !user;
     if (!user) {

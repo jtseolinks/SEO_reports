@@ -406,7 +406,7 @@ export function ClientDetailTabs({
 
               {syncData && (
                 <div className="rounded-md border bg-muted/30 p-3 space-y-2 text-xs">
-                  <p className="font-medium text-sm">{syncData.period.label} — Live Data</p>
+                  <p className="font-medium text-sm">{syncData.period.label} - Live Data</p>
                   <div className="grid grid-cols-2 gap-x-4 gap-y-1">
                     <span className="text-muted-foreground">Clicks</span>
                     <span className="font-medium">{syncData.gsc.clicks.toLocaleString()}</span>
@@ -493,10 +493,10 @@ export function ClientDetailTabs({
                         <td className="py-2">{r.reportMonth}</td>
                         <td className="py-2">{statusBadge(r.status)}</td>
                         <td className="py-2 text-muted-foreground hidden md:table-cell text-xs">
-                          {r.generatedAt ? new Date(r.generatedAt).toLocaleDateString() : "—"}
+                          {r.generatedAt ? new Date(r.generatedAt).toLocaleDateString() : "-"}
                         </td>
                         <td className="py-2 text-muted-foreground hidden md:table-cell text-xs">
-                          {r.sentAt ? new Date(r.sentAt).toLocaleDateString() : "—"}
+                          {r.sentAt ? new Date(r.sentAt).toLocaleDateString() : "-"}
                         </td>
                         <td className="py-2">
                           <div className="flex items-center justify-end gap-1">

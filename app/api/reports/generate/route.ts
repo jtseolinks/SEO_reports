@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
         const mime = ext === "svg" ? "image/svg+xml" : ext === "png" ? "image/png" : "image/jpeg";
         logoDataUrl = `data:${mime};base64,${logoBuffer.toString("base64")}`;
       } catch {
-        // logo file not found — skip silently
+        // logo file not found - skip silently
       }
     }
 

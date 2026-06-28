@@ -165,7 +165,7 @@ function AgencySection({
             <label className="field-label">תיאור הסוכנות</label>
             <textarea className="rk-input" value={form.description} rows={3}
               onChange={e => updateField("description", e.target.value)}
-              placeholder="תיאור קצר — יופיע בפתח הדוח ובחתימת המייל"
+              placeholder="תיאור קצר - יופיע בפתח הדוח ובחתימת המייל"
               style={{ resize: "vertical" }} />
           </div>
           <SaveRow dirty={dirty} saving={saving} saveResult={saveResult} onSave={handleSave} onReset={resetForm} />
@@ -311,7 +311,7 @@ function BrandingSection({ form, dirty, saving, saveResult, updateField, handleS
               className="rk-input"
               value={form.reportFooterText}
               onChange={e => updateField("reportFooterText", e.target.value)}
-              placeholder={`© ${new Date().getFullYear()} ${form.agencyName || "הסוכנות שלי"} — כל הזכויות שמורות`}
+              placeholder={`© ${new Date().getFullYear()} ${form.agencyName || "הסוכנות שלי"} - כל הזכויות שמורות`}
             />
             <p style={{ fontSize: 12, color: "var(--text-faint)", marginTop: 5 }}>
               השאר ריק כדי להשתמש בברירת המחדל
@@ -415,7 +415,7 @@ function EmailSection({ form, dirty, saving, saveResult, updateField, handleSave
 
   return (
     <>
-      {/* Test send — SMTP server credentials are managed centrally in Super Admin → email settings */}
+      {/* Test send - SMTP server credentials are managed centrally in Super Admin → email settings */}
       <div className="card">
         <div className="card-head">
           <div>
@@ -767,7 +767,7 @@ function TeamSection({ currentUserRole }: { currentUserRole: string }) {
         alert(`קישור לאיפוס סיסמה נשלח אל ${userEmail}`);
       } else if (data.resetUrl) {
         await navigator.clipboard.writeText(data.resetUrl);
-        alert("שליחת המייל נכשלה — קישור האיפוס הועתק ללוח. שלח אותו ידנית למשתמש.");
+        alert("שליחת המייל נכשלה - קישור האיפוס הועתק ללוח. שלח אותו ידנית למשתמש.");
       }
     } finally {
       setResetting(null);
@@ -813,7 +813,7 @@ function TeamSection({ currentUserRole }: { currentUserRole: string }) {
       if (!res.ok) { setInviteResult({ ok: false, msg: data.error ?? "שגיאה בשליחה" }); return; }
       setInviteResult({
         ok: true,
-        msg: data.emailSent ? `הזמנה נשלחה אל ${inviteEmail}` : `הזמנה נוצרה — שגיאה בשליחת המייל`,
+        msg: data.emailSent ? `הזמנה נשלחה אל ${inviteEmail}` : `הזמנה נוצרה - שגיאה בשליחת המייל`,
         url: data.emailSent ? undefined : data.inviteUrl,
       });
       const r2 = await fetch("/api/agency/invitations");
@@ -851,7 +851,7 @@ function TeamSection({ currentUserRole }: { currentUserRole: string }) {
             style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
             <Mail size={13} /> הזמן משתמש
           </button>
-          {/* Direct add: OWNER only — bypasses invite flow */}
+          {/* Direct add: OWNER only - bypasses invite flow */}
           {isOwner && (
             <button onClick={() => { setAddOpen(o => !o); setAddErr(""); setInviteOpen(false); }}
               className="btn btn-secondary sm"
@@ -993,7 +993,7 @@ function TeamSection({ currentUserRole }: { currentUserRole: string }) {
                           <div style={{ width: 28, height: 28, borderRadius: "50%", background: "var(--accent-soft)", display: "grid", placeItems: "center", fontSize: 11, fontWeight: 700, color: "var(--accent)", flexShrink: 0 }}>
                             {(u.name || u.email)[0].toUpperCase()}
                           </div>
-                          {u.name || "—"}
+                          {u.name || "-"}
                         </div>
                       )}
                     </td>
@@ -1050,7 +1050,7 @@ function TeamSection({ currentUserRole }: { currentUserRole: string }) {
                             {/* Reset password: OWNER for anyone; ADMIN for non-owners */}
                             {(isOwner || u.role !== "OWNER") && (
                               <button onClick={() => resetUserPassword(u.id, u.email)} disabled={resetting === u.id}
-                                className="iconbtn" title="אפס סיסמה — שלח קישור איפוס">
+                                className="iconbtn" title="אפס סיסמה - שלח קישור איפוס">
                                 {resetting === u.id ? <Loader2 size={13} className="animate-spin" /> : <KeyRound size={13} />}
                               </button>
                             )}

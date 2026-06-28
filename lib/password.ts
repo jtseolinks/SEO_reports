@@ -4,7 +4,7 @@
 
 export const PASSWORD_MIN_LENGTH = 8;
 
-// A small blocklist of obviously-weak passwords. Not exhaustive — the structural
+// A small blocklist of obviously-weak passwords. Not exhaustive - the structural
 // rules below catch most weak inputs; this just rejects the worst offenders.
 const COMMON_PASSWORDS = new Set([
   "password", "password1", "passw0rd", "123456", "1234567", "12345678",
@@ -22,10 +22,10 @@ export function validatePassword(pw: string): string | null {
   if (!/[A-Z]/.test(pw)) return "הסיסמה חייבת לכלול אות גדולה באנגלית (A-Z)";
   if (!/[0-9]/.test(pw)) return "הסיסמה חייבת לכלול ספרה (0-9)";
   if (COMMON_PASSWORDS.has(pw.toLowerCase()))
-    return "הסיסמה נפוצה מדי — בחר סיסמה ייחודית";
-  if (/^(.)\1+$/.test(pw)) return "הסיסמה חלשה מדי — תו אחד חוזר";
+    return "הסיסמה נפוצה מדי - בחר סיסמה ייחודית";
+  if (/^(.)\1+$/.test(pw)) return "הסיסמה חלשה מדי - תו אחד חוזר";
   if (isSequentialRun(pw.toLowerCase()))
-    return "הסיסמה חלשה מדי — רצף תווים עוקבים";
+    return "הסיסמה חלשה מדי - רצף תווים עוקבים";
   return null;
 }
 
