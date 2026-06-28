@@ -58,74 +58,98 @@ function changeBadge(m: ReportMetricChange, lowerIsBetter = false): string {
 
 // ── KPI card ──────────────────────────────────────────────────────────────────
 
-function kpiCard(label: string, value: string, sub: string, m: ReportMetricChange, lowerIsBetter = false): string {
+function kpiCard(label: string, value: string, sub: string, m: ReportMetricChange, lowerIsBetter = false, prevValue = ""): string {
   return `
   <div style="flex:1;background:#F8F9FB;border:1.5px solid #E8EAEE;border-radius:12px;padding:18px 20px;">
     <div style="font-size:11px;color:#6b7280;font-weight:500;margin-bottom:4px">${label}</div>
     <div style="font-size:28px;font-weight:800;color:#111827;letter-spacing:-0.03em;line-height:1.1">${value}</div>
     ${sub ? `<div style="font-size:11px;color:#9ca3af;margin-top:2px">${sub}</div>` : ""}
+    ${prevValue ? `<div style="font-size:11px;color:#9ca3af;margin-top:8px;padding-top:8px;border-top:1px solid #EEF0F3">תקופה קודמת: <span style="font-weight:700;color:#6b7280">${prevValue}</span></div>` : ""}
     <div style="margin-top:10px">${changeBadge(m, lowerIsBetter)}</div>
   </div>`;
 }
 
 // ── SVG trend chart ───────────────────────────────────────────────────────────
 
-function trendChart(trendData: { date: string; clicks: number }[]): string {
-  if (!trendData || trendData.length < 3) {
-    return `<div style="height:120px;display:flex;align-items:center;justify-content:center;color:#9ca3af;font-size:12px">אין נתוני מגמה זמינים</div>`;
+// Dual-line clicks + impressions chart — mirrors the live GSC panel on the admin
+// client dashboard (DualLineChart). Clicks (blue, left axis) over impressions
+// (purple, right axis), with a legend showing the period totals.
+function trendChart(
+  trendData: { date: string; clicks: number; impressions: number }[],
+  totals?: { clicks: number; impressions: number },
+): string {
+  if (!trendData || trendData.length < 2) {
+    return `<div style="height:200px;display:flex;align-items:center;justify-content:center;color:#9ca3af;font-size:12px">אין נתוני מגמה זמינים</div>`;
   }
 
-  const W = 680, H = 140;
-  const pt = 16, pb = 28, pl = 36, pr = 12;
+  const W = 700, H = 220;
+  const pt = 14, pb = 30, pl = 44, pr = 44;
   const chartW = W - pl - pr;
   const chartH = H - pt - pb;
   const n = trendData.length;
 
-  const maxV = Math.max(...trendData.map(d => d.clicks), 1);
-  const minV = Math.min(...trendData.map(d => d.clicks));
-  const range = maxV - minV || 1;
+  const maxC = Math.max(...trendData.map(d => d.clicks), 1);
+  const maxI = Math.max(...trendData.map(d => d.impressions), 1);
 
-  const x = (i: number) => pl + (i / (n - 1)) * chartW;
-  const y = (v: number) => pt + (1 - (v - minV) / range) * chartH;
+  const x = (i: number) => pl + (i / Math.max(n - 1, 1)) * chartW;
+  const yC = (v: number) => pt + (1 - v / maxC) * chartH;
+  const yI = (v: number) => pt + (1 - v / maxI) * chartH;
 
-  const pts = trendData.map((d, i) => `${x(i).toFixed(1)},${y(d.clicks).toFixed(1)}`).join(" ");
-  const area = `${x(0).toFixed(1)},${(H - pb).toFixed(1)} ${pts} ${x(n - 1).toFixed(1)},${(H - pb).toFixed(1)}`;
+  const cPts = trendData.map((d, i) => `${x(i).toFixed(1)},${yC(d.clicks).toFixed(1)}`).join(" ");
+  const iPts = trendData.map((d, i) => `${x(i).toFixed(1)},${yI(d.impressions).toFixed(1)}`).join(" ");
+  const cArea = `${x(0).toFixed(1)},${(H - pb).toFixed(1)} ${cPts} ${x(n - 1).toFixed(1)},${(H - pb).toFixed(1)}`;
+  const iArea = `${x(0).toFixed(1)},${(H - pb).toFixed(1)} ${iPts} ${x(n - 1).toFixed(1)},${(H - pb).toFixed(1)}`;
 
-  // X-axis date labels
-  const step = Math.ceil(n / 6);
-  const xLabels = trendData
-    .filter((_, i) => i === 0 || i === n - 1 || i % step === 0)
-    .map(d => {
-      const i = trendData.indexOf(d);
-      const day = new Date(d.date + "T12:00:00").getDate();
-      return `<text x="${x(i).toFixed(1)}" y="${H - 6}" text-anchor="middle" font-size="9" fill="#9ca3af" font-family="Heebo,Arial,sans-serif">${day}</text>`;
-    }).join("");
+  const step = Math.max(1, Math.ceil(n / 7));
+  const fmtK = (v: number) => v >= 1000 ? (v / 1000).toFixed(1).replace(/\.0$/, "") + "K" : String(v);
 
-  // Y gridlines
-  const gridLines = [0, 0.5, 1].map(pct => {
+  // Y gridlines + dual axis labels (clicks left, impressions right)
+  const gridLines = [0, 0.25, 0.5, 0.75, 1].map(pct => {
     const yv = pt + (1 - pct) * chartH;
-    const val = Math.round(minV + pct * range);
-    const label = val >= 1000 ? (val / 1000).toFixed(1).replace(/\.0$/, "") + "K" : val.toString();
     return `
       <line x1="${pl}" y1="${yv.toFixed(1)}" x2="${W - pr}" y2="${yv.toFixed(1)}" stroke="#f1f5f9" stroke-width="1"/>
-      <text x="${(pl - 5).toFixed(1)}" y="${(yv + 3.5).toFixed(1)}" text-anchor="end" font-size="8" fill="#cbd5e1" font-family="Heebo,Arial,sans-serif">${label}</text>`;
+      <text x="${(pl - 5).toFixed(1)}" y="${(yv + 3.5).toFixed(1)}" text-anchor="end" font-size="8" fill="#93c5fd" font-family="Heebo,Arial,sans-serif">${fmtK(Math.round(maxC * pct))}</text>
+      <text x="${(W - pr + 5).toFixed(1)}" y="${(yv + 3.5).toFixed(1)}" text-anchor="start" font-size="8" fill="#c4b5fd" font-family="Heebo,Arial,sans-serif">${fmtK(Math.round(maxI * pct))}</text>`;
   }).join("");
 
-  // Highlight dots for peak and today
-  const peakIdx = trendData.reduce((mi, d, i) => d.clicks > trendData[mi].clicks ? i : mi, 0);
+  // X-axis date labels (dd.m)
+  const xLabels = trendData.map((d, i) => {
+    if (i !== 0 && i !== n - 1 && i % step !== 0) return "";
+    const date = new Date(d.date + "T12:00:00");
+    return `<text x="${x(i).toFixed(1)}" y="${H - 9}" text-anchor="middle" font-size="9" fill="#9ca3af" font-family="Heebo,Arial,sans-serif">${date.getDate()}.${date.getMonth() + 1}</text>`;
+  }).join("");
+
+  const legend = `
+  <div style="display:flex;gap:18px;margin-bottom:8px;font-size:11px;color:#6b7280">
+    <span style="display:inline-flex;align-items:center;gap:5px">
+      <span style="width:14px;height:3px;background:#1E6FBF;border-radius:2px;display:inline-block"></span>
+      סה"כ קליקים${totals ? `<strong style="color:#1E6FBF">${fmtBig(totals.clicks)}</strong>` : ""}
+    </span>
+    <span style="display:inline-flex;align-items:center;gap:5px">
+      <span style="width:14px;height:3px;background:#7C3AED;border-radius:2px;display:inline-block"></span>
+      סה"כ הופעות${totals ? `<strong style="color:#7C3AED">${fmtBig(totals.impressions)}</strong>` : ""}
+    </span>
+  </div>`;
 
   return `
-  <svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="display:block;width:100%;height:${H}px">
+  ${legend}
+  <svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none" style="display:block;width:100%;height:${H}px">
     <defs>
-      <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="#1E2D7D" stop-opacity="0.18"/>
-        <stop offset="100%" stop-color="#1E2D7D" stop-opacity="0.01"/>
+      <linearGradient id="gscCGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#1E6FBF" stop-opacity="0.2"/>
+        <stop offset="100%" stop-color="#1E6FBF" stop-opacity="0.01"/>
+      </linearGradient>
+      <linearGradient id="gscIGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#7C3AED" stop-opacity="0.15"/>
+        <stop offset="100%" stop-color="#7C3AED" stop-opacity="0.01"/>
       </linearGradient>
     </defs>
     ${gridLines}
-    <polygon points="${area}" fill="url(#areaGrad)"/>
-    <polyline points="${pts}" fill="none" stroke="#1E2D7D" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
-    ${trendData.map((d, i) => `<circle cx="${x(i).toFixed(1)}" cy="${y(d.clicks).toFixed(1)}" r="${i === peakIdx ? 4 : 2.5}" fill="${i === peakIdx ? "#5BC2F0" : "#1E2D7D"}" opacity="${i === peakIdx ? 1 : 0.7}"/>`).join("")}
+    <line x1="${pl}" y1="${(H - pb).toFixed(1)}" x2="${W - pr}" y2="${(H - pb).toFixed(1)}" stroke="#e5e7eb" stroke-width="1"/>
+    <polygon points="${iArea}" fill="url(#gscIGrad)"/>
+    <polygon points="${cArea}" fill="url(#gscCGrad)"/>
+    <polyline points="${iPts}" fill="none" stroke="#7C3AED" stroke-width="1.2" stroke-linejoin="round" stroke-linecap="round"/>
+    <polyline points="${cPts}" fill="none" stroke="#1E6FBF" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
     ${xLabels}
   </svg>`;
 }
@@ -208,10 +232,10 @@ export function generateReportHtml(data: ReportData, agencyName: string, agencyE
 
   // ── section 01: KPIs ──────────────────────────────────────────────────────
   const kpiCards = [
-    cfg.kpi_clicks      && kpiCard("קליקים אורגניים", fmtBig(data.gsc.clicks.current), "", data.gsc.clicks),
-    cfg.kpi_impressions && kpiCard("חשיפות", fmtBig(data.gsc.impressions.current), "", data.gsc.impressions),
-    cfg.kpi_ctr         && kpiCard("CTR ממוצע", fmtPct(data.gsc.ctr.current * 100), "", data.gsc.ctr),
-    cfg.kpi_position    && kpiCard("פוזיציה ממוצעת", fmtNum(data.gsc.position.current, 1), "מיקום ממוצע ב-Google", data.gsc.position, true),
+    cfg.kpi_clicks      && kpiCard("קליקים אורגניים", fmtBig(data.gsc.clicks.current), "", data.gsc.clicks, false, fmtBig(data.gsc.clicks.previous)),
+    cfg.kpi_impressions && kpiCard("חשיפות", fmtBig(data.gsc.impressions.current), "", data.gsc.impressions, false, fmtBig(data.gsc.impressions.previous)),
+    cfg.kpi_ctr         && kpiCard("CTR ממוצע", fmtPct(data.gsc.ctr.current * 100), "", data.gsc.ctr, false, fmtPct(data.gsc.ctr.previous * 100)),
+    cfg.kpi_position    && kpiCard("פוזיציה ממוצעת", fmtNum(data.gsc.position.current, 1), "מיקום ממוצע ב-Google", data.gsc.position, true, fmtNum(data.gsc.position.previous, 1)),
   ].filter(Boolean).join("");
   const kpis = kpiCards ? `<div style="display:flex;gap:12px">${kpiCards}</div>` : "";
 
@@ -223,7 +247,7 @@ export function generateReportHtml(data: ReportData, agencyName: string, agencyE
     : "";
 
   // ── section 02: Organic Traffic ──────────────────────────────────────────
-  const chart = cfg.trend_chart ? trendChart(data.gsc.trendData) : "";
+  const chart = cfg.trend_chart ? trendChart(data.gsc.trendData, { clicks: data.gsc.clicks.current, impressions: data.gsc.impressions.current }) : "";
 
   const ga4StatItems = hasGa4 ? [
     cfg.ga4_sessions ? `
